@@ -1,5 +1,15 @@
+// Copyright 2009 Eden Li. All rights reserved.
+// Use of this source code is governed by a BSD-style
+// license that can be found in the LICENSE file.
+
+// Wrapper library to hide mysql structures from cgo since it can't yet
+// properly parse it.  All mysql typedefs are hidden behind void pointers.  Not
+// the safest thing, but at least it gets us by until cgo is fixed.  See the
+// README for more information.
+
 #include "mw.h"
 #include <stdlib.h>
+#include <stdio.h>
 #include <mysql.h>
 
 void mw_library_init() {
@@ -7,7 +17,7 @@ void mw_library_init() {
 }
 
 mw mw_init(mw h) {
-    return (mw )mysql_init((MYSQL *)h);
+    return (mw)mysql_init((MYSQL *)h);
 }
 
 const char *mw_error(mw h) {
@@ -18,7 +28,8 @@ mw mw_real_connect(
     mw h, const char *host, const char *uname,
     const char *passwd, const char *db, int port)
 {
-    return (mw)mysql_real_connect((MYSQL *)h,
+    return (mw)mysql_real_connect(
+		(MYSQL *)h,
         host, uname, passwd, db, port, NULL, 0);
 }
 
@@ -30,8 +41,8 @@ void mw_free_result(mwres res) {
     mysql_free_result((MYSQL_RES *)res);
 }
 
-void mw_query(mw h, const char *q) {
-	mysql_query((MYSQL *)h, q);
+int mw_query(mw h, const char *q) {
+	return mysql_query((MYSQL *)h, q);
 }
 
 mwres mw_store_result(mw h) {
@@ -48,6 +59,10 @@ const char *mw_field_name_at(mwfield field, int i) {
 
 int mw_field_type_at(mwfield field, int i) {
     return ((MYSQL_FIELD *)field)[i].type;
+}
+
+int mw_field_count(mw h) {
+    return mysql_field_count((MYSQL *)h);
 }
 
 int mw_num_fields(mwres res) {

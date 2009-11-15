@@ -14,11 +14,12 @@ mw mw_real_connect(
 const char *mw_error(mw h);
 void mw_close(mw h);
 void mw_free_result(mwres res);
-void mw_query(mw h, const char *q);
+int mw_query(mw h, const char *q);
 mwres mw_store_result(mw h);
 char *mw_row(mwrow row, int i);
 const char *mw_field_name_at(mwfield field, int i);
 int mw_field_type_at(mwfield field, int i);
+int mw_field_count(mw h);
 int mw_num_fields(mwres res);
 mwfield mw_fetch_fields(mwres res);
 mwrow mw_fetch_row(mwres res);
