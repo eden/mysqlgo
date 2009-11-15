@@ -1,16 +1,21 @@
 MySQL Bindings for Go (golang)
 ==============================
 
-Implements rudimentary MySQL support for Go.
+Implements rudimentary MySQL support for Go.  The interface vaguely follows
+[Python's PEP 249](http://www.python.org/dev/peps/pep-0249/).
 
-`mw.{c,h}` is used to wrap mysql since `cgo` currently can't translate mysql
-header files due to the following issues.
+Install
+-------
 
-- http://code.google.com/p/go/issues/detail?id=126
-- http://code.google.com/p/go/issues/detail?id=36
+    cd mysqlgo
+    make install
 
-The interface vaguely follows [Python's PEP
-249](http://www.python.org/dev/peps/pep-0249/)
+Example
+-------
+
+    cd mysqlgo
+    make example
+    ./example -host=127.0.0.1 -user=root -dbname=test
 
 Synopsis
 --------
@@ -29,13 +34,6 @@ Synopsis
     cur.Close();
     conn.Close();
 
-Installing and Running Example
-------------------------------
-
-    make install
-    make example
-    ./example -host=127.0.0.1 -user=root -dbname=test
-
 TODO
 ----
 - Proper type conversion.  Right now all values are returned as strings.
@@ -43,3 +41,12 @@ TODO
 - Better documentation.
 - Unwrap MySQL bits once `cgo` is fixed.
 - Connection pools and thread testing.
+
+Known bugs in `cgo`
+-------------------
+
+`mw.{c,h}` is used to wrap mysql since `cgo` currently can't translate mysql
+header files due to the following issues.
+
+- http://code.google.com/p/go/issues/detail?id=126
+- http://code.google.com/p/go/issues/detail?id=36
