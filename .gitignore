@@ -1,0 +1,8 @@
+*.cgo[12].go
+*.cgo[34].c
+*.so
+_obj
+_test
+*.[568vqo]
+*.a
+[568vq].out

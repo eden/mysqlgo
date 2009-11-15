@@ -1,0 +1,4 @@
+ - Wrap MySQL bits in C to get around the need for cgo patches.
+ - Proper type conversion.  Right now all values are returned as strings.
+ - Tests.
+ - Better documentation.
