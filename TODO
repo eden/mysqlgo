@@ -1,5 +1,0 @@
- - Proper type conversion.  Right now all values are returned as strings.
- - More tests.
- - Better documentation.
- - Unwrap MySQL bits once cgo is fixed.
- - Connection pools and thread testing.
