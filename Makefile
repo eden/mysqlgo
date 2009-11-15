@@ -4,7 +4,7 @@ TARG=mysql
 CGOFILES=mysql.go
 MW_CFLAGS=$(shell mysql_config --cflags)
 CGO_LDFLAGS=mw.o $(shell mysql_config --libs)
-CLEANFILES+=main
+CLEANFILES+=mw.o
 
 include $(GOROOT)/src/Make.pkg
 
