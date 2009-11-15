@@ -1,0 +1,30 @@
+
+Implements rudimentary MySQL support for Go.  In order to get this to
+compile, you'll need to apply gcc.patch to your go source since there
+are two outstanding bugs that prevents `cgo` from properly translating
+the mysql header files.  They are:
+
+	- http://code.google.com/p/go/issues/detail?id=126
+	- http://code.google.com/p/go/issues/detail?id=36
+
+The interface vaguely follows Python's PEP 249:
+	http://www.python.org/dev/peps/pep-0249/
+
+Example:
+
+	conn := mysql.NewConn();
+	conn.Connect(&mysql.ConnInfo{
+		"host", 3306, "user", "pass", "db"
+	})
+	cur := conn.Execute("SELECT * FROM objects WHERE field < %i",
+		100);
+
+	tuple, err := cur.FetchOne();
+	for ; tuple != nil; tuple, err = cur.FetchOne() {
+		fmt.Println(tuple)
+	}
+	if err != nil {
+		fmt.Fprintf(fmt.Stderr, "Encountered error: %s\n", err.String());
+	}
+	cur.Close();
+	conn.Close()

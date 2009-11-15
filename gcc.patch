@@ -1,0 +1,29 @@
+diff -r bbc290c53f85 src/cmd/cgo/gcc.go
+--- a/src/cmd/cgo/gcc.go	Thu Nov 12 16:12:28 2009 -0800
++++ b/src/cmd/cgo/gcc.go	Thu Nov 12 19:42:47 2009 -0800
+@@ -420,6 +420,13 @@
+ 			break;
+ 		}
+ 
++		// Translate unknown type pointers as unsafe.Pointer
++		if dt.Type.Size() < 0 {
++			t.Go = c.unsafePointer;
++			t.C = "void*";
++			break;
++		}
++
+ 		gt := &ast.StarExpr{};
+ 		t.Go = gt;	// publish before recursive call
+ 		sub := c.Type(dt.Type);
+@@ -584,7 +591,10 @@
+ }
+ 
+ // Identifier
+-func (c *typeConv) Ident(s string) *ast.Ident	{ return &ast.Ident{Value: s} }
++func (c *typeConv) Ident(s string) *ast.Ident	{
++	if s == "type" { s = "_" }
++	return &ast.Ident{Value: s}
++}
+ 
+ // Opaque type of n bytes.
+ func (c *typeConv) Opaque(n int64) ast.Expr {
