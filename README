@@ -11,21 +11,4 @@ these problems, but it can compile without patching your version of go.
 The interface vaguely follows Python's PEP 249:
 	http://www.python.org/dev/peps/pep-0249/
 
-Example:
-
-	conn := mysql.NewConn();
-	conn.Connect(&mysql.ConnInfo{
-		"host", 3306, "user", "pass", "db"
-	})
-	cur := conn.Execute("SELECT * FROM objects WHERE field < %i",
-		100);
-
-	tuple, err := cur.FetchOne();
-	for ; tuple != nil; tuple, err = cur.FetchOne() {
-		fmt.Println(tuple)
-	}
-	if err != nil {
-		fmt.Fprintf(fmt.Stderr, "Encountered error: %s\n", err.String());
-	}
-	cur.Close();
-	conn.Close()
+See example.go for more.
