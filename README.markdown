@@ -12,8 +12,25 @@ header files due to the following issues.
 The interface vaguely follows [Python's PEP
 249](http://www.python.org/dev/peps/pep-0249/)
 
-Installing and Running
-----------------------
+Synopsis
+--------
+
+    conn := mysql.NewConn();
+    err := conn.Connect(&mysql.ConnInfo{host, port, user, pass, dbname});
+    if err != nil { panic("Connect error") }
+
+    cur := conn.Cursor();
+    cur.Execute("SELECT * FROM table");
+    tuple, err := cur.FetchOne();
+    for ; err == nil && tuple != nil; tuple, err = cur.FetchOne() {
+      fmt.Println(tuple)
+    }
+
+    cur.Close();
+    conn.Close();
+
+Installing and Running Example
+------------------------------
 
     make install
     make example
