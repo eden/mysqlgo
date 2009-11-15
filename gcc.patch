@@ -1,40 +1,11 @@
 diff -r cb140bac9ab0 src/cmd/cgo/gcc.go
 --- a/src/cmd/cgo/gcc.go	Thu Nov 12 14:55:26 2009 -0800
-+++ b/src/cmd/cgo/gcc.go	Sun Nov 15 00:29:05 2009 -0800
-@@ -129,9 +129,11 @@
- 		if e == nil {
- 			break
- 		}
-+
- 		if e.Tag != dwarf.TagVariable {
- 			goto Continue
- 		}
-+
- 		name, _ := e.Val(dwarf.AttrName).(string);
- 		typOff, _ := e.Val(dwarf.AttrType).(dwarf.Offset);
- 		if name == "" || typOff == 0 {
-@@ -236,6 +238,7 @@
- type typeConv struct {
- 	// Cache of already-translated or in-progress types.
- 	m	map[dwarf.Type]*Type;
-+	kws	map[string]bool;
- 	typedef	map[string]ast.Expr;
- 
- 	// Predeclared types.
-@@ -255,6 +258,7 @@
- func (c *typeConv) Init(ptrSize int64) {
- 	c.ptrSize = ptrSize;
- 	c.m = make(map[dwarf.Type]*Type);
-+	c.kws = make(map[string]bool);
- 	c.typedef = make(map[string]ast.Expr);
- 	c.byte = c.Ident("byte");
- 	c.int8 = c.Ident("int8");
-@@ -315,11 +319,15 @@
++++ b/src/cmd/cgo/gcc.go	Sun Nov 15 01:05:57 2009 -0800
+@@ -315,11 +315,14 @@
  	t.Size = dtype.Size();
  	t.Align = -1;
  	t.C = dtype.Common().Name;
 +	c.m[dtype] = t;
-+
  	if t.Size < 0 {
 -		fatal("dwarf.Type %s reports unknown size", dtype)
 +		// Treat unsized types as [0]byte
@@ -47,7 +18,7 @@ diff -r cb140bac9ab0 src/cmd/cgo/gcc.go
  	switch dt := dtype.(type) {
  	default:
  		fatal("unexpected type: %s", dtype)
-@@ -615,6 +623,24 @@
+@@ -615,6 +618,24 @@
  	csyntax = "struct { ";
  	fld := make([]*ast.Field, 0, 2*len(dt.Field)+1);	// enough for padding around every field
  	off := int64(0);
@@ -72,7 +43,7 @@ diff -r cb140bac9ab0 src/cmd/cgo/gcc.go
  	for _, f := range dt.Field {
  		if f.ByteOffset > off {
  			fld = c.pad(fld, f.ByteOffset-off);
-@@ -623,7 +649,10 @@
+@@ -623,7 +644,10 @@
  		t := c.Type(f.Type);
  		n := len(fld);
  		fld = fld[0 : n+1];
