@@ -199,13 +199,13 @@ func (c *Cursor) FetchOne() (data []interface {}, err os.Error) {
 // less than `count` rows if there are not enough rows left in the result set
 // left.  nil is returned only if an error occurred.  The error, if any, is
 // given as the second return value.  Returns an error if count is 0.
-func (c *Cursor) FetchMany(count uint16) (rows []interface {}, err os.Error) {
-	rows = make([]interface {}, count);
+func (c *Cursor) FetchMany(count uint16) (rows [][]interface {}, err os.Error) {
 	if count == 0 { return nil, os.NewError("Invalid count") }
 
-	i := 0;
+	rows = make([][]interface {}, count);
+	i := uint16(0);
 	row, err := c.FetchOne();
-	for row != nil && err == nil {
+	for i < count && row != nil && err == nil {
 		rows[i] = row;
 		i += 1;
 		row, err = c.FetchOne();
@@ -220,7 +220,7 @@ func (c *Cursor) FetchMany(count uint16) (rows []interface {}, err os.Error) {
 // returned only if an error occurred.  The error, if any, is given as the
 // second return value.  If the result set contains more than 65535 rows, an
 // error is returned.
-func (c *Cursor) FetchAll() ([]interface {}, os.Error) {
+func (c *Cursor) FetchAll() ([][]interface {}, os.Error) {
 	count := c.RowCount();
 	if count >= 65535 {
 		return nil, os.NewError(

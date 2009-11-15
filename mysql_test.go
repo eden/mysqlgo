@@ -52,13 +52,13 @@ func TestCursorErrors(t *testing.T) {
 		error(t, nil, "FetchOne before Execute should error")
 	}
 
-	res, err = cur.FetchMany(10);
-	if res != nil || err == nil {
+	resm, err := cur.FetchMany(10);
+	if resm != nil || err == nil {
 		error(t, nil, "FetchMany(10) before Execute should error")
 	}
 
-	res, err = cur.FetchAll();
-	if res != nil || err == nil {
+	resm, err = cur.FetchAll();
+	if resm != nil || err == nil {
 		error(t, nil, "FetchAll before Execute should error")
 	}
 
@@ -147,6 +147,44 @@ func TestCursor(t *testing.T) {
 		}
 		i += 1;
 		row, err = cur.FetchOne();
+	}
+
+	// Test FetchMany
+	err = cur.Execute("SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
+	if err != nil {
+		error(t, err, "Couldn't select from temporary table test.t")
+	}
+
+	var results [][]interface {};
+	results, err = cur.FetchMany(3);
+	if err != nil { error(t, err, "Error") }
+	if len(results) != 3 {
+		t.Errorf("Result count mismatch 3 != %d", len(results))
+	}
+	for i, v := range results {
+		if v, ok := v[1].(string); !ok || values[i] != v {
+			if ok { t.Errorf("Mismatch %q != %q", values[i], v) }
+			else { t.Errorf("Couldn't convert %v to string.", row[1]) }
+		}
+	}
+
+	// Test FetchAll
+	err = cur.Execute("SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
+	if err != nil {
+		error(t, err, "Couldn't select from temporary table test.t")
+	}
+
+	results, err = cur.FetchAll();
+	if err != nil { error(t, err, "Error") }
+
+	if len(results) != len(values) {
+		t.Errorf("Result count mismatch %d != %d", len(values), len(results))
+	}
+	for i, v := range results {
+		if v, ok := v[1].(string); !ok || values[i] != v {
+			if ok { t.Errorf("Mismatch %q != %q", values[i], v) }
+			else { t.Errorf("Couldn't convert %v to string.", row[1]) }
+		}
 	}
 
 	cur.Close();
