@@ -79,6 +79,16 @@ func TestCursorErrors(t *testing.T) {
 		error(t, nil, "FetchOne on no-result statement should error")
 	}
 
+	resm, err = cur.FetchMany(10);
+	if res != nil || err == nil {
+		error(t, nil, "FetchMany on no-result statement should error")
+	}
+
+	resm, err = cur.FetchAll();
+	if res != nil || err == nil {
+		error(t, nil, "FetchAll on no-result statement should error")
+	}
+
 	cols := cur.Description();
 	if len(cols) > 0 {
 		t.Error("Description should return no 0-length columns")
