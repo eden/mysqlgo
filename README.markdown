@@ -1,8 +1,9 @@
 MySQL Bindings for Go (golang)
 ==============================
 
-Implements rudimentary MySQL support for Go.  The interface vaguely follows
-[Python's PEP 249](http://www.python.org/dev/peps/pep-0249/).
+Implements rudimentary MySQL support for Go via libmysql.  The interface
+vaguely follows [Python's PEP 249](http://www.python.org/dev/peps/pep-0249/).
+The `Makefile` assumes `mysql_config` is in your path.
 
 Install
 -------
