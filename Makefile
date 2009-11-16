@@ -3,8 +3,8 @@ include $(GOROOT)/src/Make.$(GOARCH)
 TARG=mysql
 CGOFILES=mysql.go
 MYSQL_CONFIG=$(shell which mysql_config)
-MW_CFLAGS=$(shell mysql_config --cflags)
-CGO_LDFLAGS=mw.o $(shell mysql_config --libs)
+MW_CFLAGS=$(shell $(MYSQL_CONFIG) --cflags)
+CGO_LDFLAGS=mw.o $(shell $(MYSQL_CONFIG) --libs)
 CLEANFILES+=mw.o example
 
 include $(GOROOT)/src/Make.pkg
