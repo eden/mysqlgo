@@ -41,7 +41,7 @@ TODO
 - More tests.
 - Better documentation.
 - Unwrap MySQL bits once `cgo` is fixed.
-- Connection pools and thread testing.
+- Connection pools?
 
 Known bugs in `cgo`
 -------------------
