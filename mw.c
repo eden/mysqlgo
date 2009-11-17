@@ -81,3 +81,10 @@ unsigned long long mw_num_rows(mwres res) {
     return mysql_num_rows((MYSQL_RES *)res);
 }
 
+void mw_thread_init(void) {
+	(void)mysql_thread_init();
+}
+
+void mw_thread_end(void) {
+	mysql_thread_end();
+}

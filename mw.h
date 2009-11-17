@@ -25,4 +25,7 @@ mwfield mw_fetch_fields(mwres res);
 mwrow mw_fetch_row(mwres res);
 unsigned long long mw_num_rows(mwres res);
 
+void mw_thread_init(void);
+void mw_thread_end(void);
+
 #endif // __mw_h

@@ -11,11 +11,14 @@ import "C"
 
 import "os"
 import "fmt"
+import "sync"
 import "unsafe"
 
 func init() {
 	C.mw_library_init();
 }
+
+var MaxFetchCount = 65535
 
 // ConnInfo represents MySQL connection information.
 //	- host: Host to connect to, passed directly into mw_real_connect
@@ -35,6 +38,7 @@ type ConnInfo struct {
 // Conn maintains the connection state of a single MySQL connection.
 type Conn struct {
 	h	C.mw;
+	queryLock	sync.Mutex;
 }
 
 // Return a new database connection.
@@ -100,6 +104,9 @@ func (my *Conn) Cursor() *Cursor {
 	return nil;
 }
 
+func (my *Conn) lock()	{ my.queryLock.Lock() }
+func (my *Conn) unlock()	{ my.queryLock.Unlock() }
+
 // Closes and cleans up the connection.
 func (my *Conn) Close() {
 	C.mw_close(use(my.h));
@@ -135,6 +142,10 @@ func (c *Cursor) Execute(query string, parameters ...) (err os.Error) {
 
 	query = fmt.Sprintf(query, parameters);
 
+	// mysql_query and mysql_store_result can't be interleaved between threads
+	// on the same connection so we need to lock the two operations together
+	c.my.lock();
+
 	// TODO figure out how to convert a string to a *C.char
 	// and use mw_real_query instead (saves malloc/copy)
 	q := C.CString(query);
@@ -143,19 +154,22 @@ func (c *Cursor) Execute(query string, parameters ...) (err os.Error) {
 
 	if err = c.my.LastError(); err != nil || rcode != 0 {
 		if err == nil { err = os.NewError("Query failed.") }
-		return;
+		goto UnlockAndReturn
 	}
 
 	c.nfields = int(C.mw_field_count(use(c.my.h)));
-	if c.nfields > 0 {
-		c.res = C.mw_store_result(use(c.my.h));
-		if err = c.my.LastError(); err != nil || c.res == nil {
-			if err == nil { err = os.NewError("No results returned.") }
+	c.res = C.mw_store_result(use(c.my.h));
+	err = c.my.LastError();
+	if err != nil || (c.res == nil && c.nfields > 0) {
+		if err == nil {
+			err = os.NewError("No results returned.");
 			c.cleanup();
-			return;
 		}
+		goto UnlockAndReturn
 	}
 
+UnlockAndReturn:
+	c.my.unlock();
 	return;
 }
 
@@ -218,11 +232,11 @@ func (c *Cursor) FetchMany(count uint16) (rows [][]interface {}, err os.Error) {
 
 // Returns a list of tuples of all remaining tuples in the result set.  nil is
 // returned only if an error occurred.  The error, if any, is given as the
-// second return value.  If the result set contains more than 65535 rows, an
-// error is returned.
+// second return value.  If the result set contains more than MaxFetchCount
+// rows, an error is returned.
 func (c *Cursor) FetchAll() ([][]interface {}, os.Error) {
 	count := c.RowCount();
-	if count >= 65535 {
+	if count >= uint64(MaxFetchCount) {
 		return nil, os.NewError(
 			"Too many rows in result set.  Use FetchOne or FetchMany instead")
 	}
