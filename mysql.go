@@ -6,7 +6,9 @@
 package mysql
 
 // #include <stdlib.h>
-// #include "mw.h"
+// #include <mysql.h>
+// char *row_at(MYSQL_ROW row, int i) { return row[i]; }
+// MYSQL_FIELD field_at(MYSQL_FIELD *fields, int i) { return fields[i]; }
 import "C"
 
 import "os"
@@ -15,52 +17,38 @@ import "sync"
 import "unsafe"
 
 func init() {
-	C.mw_library_init();
+	C.mysql_library_init(0, nil, nil);
 }
 
 var MaxFetchCount = 65535
 
 // ConnInfo represents MySQL connection information.
-//	- host: Host to connect to, passed directly into mw_real_connect
+//	- host: Host to connect to, passed directly into mysql_real_connect
 //	  which will resolve DNS names.
 //	- port: Port on which to connect.
 //	- uname: Username to use for the connection.
 //	- pass: Password to use for the connection.
 //	- dbname: Initial database to use after successfully connecting.
 type ConnInfo struct {
-	host	string;
-	port	int;
-	uname	string;
-	pass	string;
-	dbname	string;
+	Host	string;
+	Port	int;
+	Uname	string;
+	Pass	string;
+	Dbname	string;
 }
 
 // Conn maintains the connection state of a single MySQL connection.
 type Conn struct {
-	h	C.mw;
+	h	*C.MYSQL;
 	queryLock	sync.Mutex;
 }
 
 // Return a new database connection.
 func NewConn() *Conn	{ return new(Conn) }
 
-// Unwrap function which returns an unsafe.Pointer for the given argument.
-// This is used because cgo translates the typedefs from the wrapper into
-// unsafe pointers instead of _C_typedefname.
-func use(h interface {}) (rval unsafe.Pointer) {
-	switch ptr := h.(type) {
-	case C.mw:		rval = unsafe.Pointer(ptr)
-	case C.mwrow:	rval = unsafe.Pointer(ptr)
-	case C.mwres:	rval = unsafe.Pointer(ptr)
-	case C.mwfield: rval = unsafe.Pointer(ptr)
-	default:		panic("Tried to use() unknown type\n")
-	}
-	return;
-}
-
 // Returns the last error that occurred as an os.Error 
 func (my *Conn) LastError() os.Error {
-	if err := C.mw_error(use(my.h)); *err != 0 {
+	if err := C.mysql_error(my.h); *err != 0 {
 		return os.NewError(C.GoString(err));
 	}
 	return nil;
@@ -69,21 +57,23 @@ func (my *Conn) LastError() os.Error {
 // Connects to the server specified in the given connection info.
 func (my *Conn) Connect(conn *ConnInfo) (err os.Error) {
 	args := []*C.char{
-		C.CString(conn.host), C.CString(conn.uname),
-		C.CString(conn.pass), C.CString(conn.dbname)};
+		C.CString(conn.Host), C.CString(conn.Uname),
+		C.CString(conn.Pass), C.CString(conn.Dbname)};
 
 	if (my.h != nil) { my.Close() }
 
-	my.h = C.mw_init(nil);
+	my.h = C.mysql_init(nil);
 	if my.h == nil { return os.ENOMEM }
 
-	C.mw_real_connect(
-		use(my.h),
+	C.mysql_real_connect(
+		my.h,
 		args[0],
 		args[1],
 		args[2],
 		args[3],
-		C.int(conn.port));
+		C.uint(conn.Port),
+		nil,
+		0);
 
 	for i, _ := range args {
 		C.free(unsafe.Pointer(args[i]))
@@ -109,7 +99,7 @@ func (my *Conn) unlock()	{ my.queryLock.Unlock() }
 
 // Closes and cleans up the connection.
 func (my *Conn) Close() {
-	C.mw_close(use(my.h));
+	C.mysql_close(my.h);
 	my.h = nil;
 }
 
@@ -117,14 +107,14 @@ func (my *Conn) Close() {
 // read results.
 type Cursor struct {
 	my	*Conn;
-	res	C.mwres;
+	res	*C.MYSQL_RES;
 	nfields	int;
 }
 
 // Closes and frees the currently stored result.
 func (c *Cursor) cleanup() {
 	if c.res != nil {
-		C.mw_free_result(use(c.res));
+		C.mysql_free_result(c.res);
 		c.res = nil;
 		c.nfields = 0;
 	}
@@ -147,9 +137,9 @@ func (c *Cursor) Execute(query string, parameters ...) (err os.Error) {
 	c.my.lock();
 
 	// TODO figure out how to convert a string to a *C.char
-	// and use mw_real_query instead (saves malloc/copy)
+	// and use mysql_real_query instead (saves malloc/copy)
 	q := C.CString(query);
-	rcode := C.mw_query(use(c.my.h), q);
+	rcode := C.mysql_query(c.my.h, q);
 	C.free(unsafe.Pointer(q));
 
 	if err = c.my.LastError(); err != nil || rcode != 0 {
@@ -157,8 +147,8 @@ func (c *Cursor) Execute(query string, parameters ...) (err os.Error) {
 		goto UnlockAndReturn
 	}
 
-	c.nfields = int(C.mw_field_count(use(c.my.h)));
-	c.res = C.mw_store_result(use(c.my.h));
+	c.nfields = int(C.mysql_field_count(c.my.h));
+	c.res = C.mysql_store_result(c.my.h);
 	err = c.my.LastError();
 	if err != nil || (c.res == nil && c.nfields > 0) {
 		if err == nil {
@@ -178,12 +168,12 @@ func (c *Cursor) Description() []Column {
 	columns := make([]Column, c.nfields);
 
 	if c.res != nil && c.nfields > 0 {
-		fields := C.mw_fetch_fields(use(c.res));
+		fields := C.mysql_fetch_fields(c.res);
 
 		for i := 0; i < c.nfields; i += 1 {
 			columns[i] = Column{
-				C.GoString(C.mw_field_name_at(use(fields), C.int(i))),
-				int(C.mw_field_type_at(use(fields), C.int(i)))}
+				C.GoString(C.field_at(fields, C.int(i)).name),
+				int(C.field_at(fields, C.int(i))._type)}
 		}
 	}
 
@@ -196,13 +186,13 @@ func (c *Cursor) Description() []Column {
 func (c *Cursor) FetchOne() (data []interface {}, err os.Error) {
 	if c.res == nil { return nil, os.NewError("Fetch called before Execute") }
 
-	row := C.mw_fetch_row(use(c.res));
+	row := C.mysql_fetch_row(c.res);
 	err = c.my.LastError();
 
 	if row != nil && err == nil {
 		data = make([]interface {}, c.nfields);
 		for i := 0; i < c.nfields; i += 1 {
-			data[i] = C.GoString(C.mw_row(use(row), C.int(i)));
+			data[i] = C.GoString(C.row_at(row, C.int(i)));
 		}
 	}
 
@@ -246,7 +236,7 @@ func (c *Cursor) FetchAll() ([][]interface {}, os.Error) {
 // Returns the number of rows returned from the current result set.
 func (c *Cursor) RowCount() uint64 {
 	if c.res == nil { return 0 }
-	return uint64(C.mw_num_rows(use(c.res)));
+	return uint64(C.mysql_num_rows(c.res));
 }
 
 // Closes the current result set and prepares the cursor for re-use.
