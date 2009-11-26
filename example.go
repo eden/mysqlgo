@@ -3,7 +3,6 @@ package main
 import (
 	"mysql";
 	"flag";
-	"rand";
 	"fmt";
 	"os";
 )
@@ -34,38 +33,50 @@ func main() {
 	flag.Parse();
 	if help { flag.Usage(); os.Exit(1) }
 
-	conn := mysql.NewConn();
-	err := conn.Connect(&mysql.ConnInfo{host, port, user, pass, dbname});
+	conn, err := mysql.Open(map[string]interface{} {
+		"host": host,
+		"port": port,
+		"user": user,
+		"pass": pass,
+		"database": dbname
+	});
 
 	if err != nil {
 		fmt.Printf("Error connecting to %s:%d: %s\n",
 			host, port, err);
-
 		flag.Usage();
-
 		os.Exit(1)
 	}
 
-	cur := conn.Cursor();
 
 	fmt.Println("Creating temporary table __hello");
-	err = cur.Execute("CREATE TEMPORARY TABLE __hello (i INT)");
-	if err != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+	stmt, e := conn.Prepare("CREATE TEMPORARY TABLE __hello (i VARCHAR(255))");
+	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
 
-	fmt.Println("Inserting 100 random ints");
+	_, err = conn.Execute(stmt);
+	if err != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+	stmt.Close();
+
+	fmt.Println("Inserting 100 random numbers");
+	stmt, e = conn.Prepare("INSERT INTO __hello (i) VALUE (1000*RAND())");
+	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+
 	for i := 0; i < 100; i+=1 {
-		err = cur.Execute("INSERT INTO __hello (i) VALUE (%d)",
-			rand.Int());
+		_, err = conn.Execute(stmt);
 		if err != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
 	}
+	stmt.Close();
 
-	fmt.Println("Reading ints in order");
-	cur.Execute("SELECT i FROM __hello ORDER BY i ASC");
-	tuple, err := cur.FetchOne();
-	for ; tuple != nil; tuple, err = cur.FetchOne() {
-		fmt.Printf("%s\n", tuple[0])
+	fmt.Println("Reading numbers in lexical order");
+	stmt, e = conn.Prepare("SELECT i FROM __hello ORDER BY i ASC");
+	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+
+	cur, _ := conn.Execute(stmt);
+	for t, _ := cur.FetchOne(); t != nil; t, _ = cur.FetchOne() {
+		fmt.Printf("%#v\n", t)
 	}
-
 	cur.Close();
+	stmt.Close();
+
 	conn.Close();
 }

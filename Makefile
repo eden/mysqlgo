@@ -21,3 +21,4 @@ example: install example.go
 clean:
 	cd db; make clean
 	cd mysql; make clean
+	rm -f example example.$O
