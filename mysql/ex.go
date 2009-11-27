@@ -18,6 +18,7 @@ func main() {
 				for res, _ := cur.FetchOne(); res != nil; res, _ = cur.FetchOne() {
 					fmt.Printf("%#v\n", res);
 				}
+				cur.Close();
 			}
 			stmt.Close();
 		}

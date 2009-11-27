@@ -27,13 +27,6 @@ void assign_bind(
 	binds[i].is_null = (my_bool *)nul;
 	binds[i].error = (my_bool *)error;
 }
-
-char *effit(void *str, int len) {
-	char *s = malloc(len+1);
-	memcpy(s, str, len);
-	s[len] = 0;
-	return s;
-}
 */
 import "C"
 
@@ -59,24 +52,6 @@ type Connection struct {
 	lock	*sync.Mutex;
 }
 
-func cuintFromMap(dict map[string]interface{}, key string) (v C.uint) {
-	if val, found := dict[key]; found {
-		if s, valid := val.(int); valid {
-			v = C.uint(s)
-		}
-	}
-	return;
-}
-
-func cstringFromMap(dict map[string]interface{}, key string) (str *C.char) {
-	if val, found := dict[key]; found {
-		if s, valid := val.(string); valid {
-			str = C.CString(s)
-		}
-	}
-	return;
-}
-
 // The following arguments can be used to setup the connection:
 //
 //	- host: Host to connect to, passed directly into mysql_real_connect
@@ -93,9 +68,18 @@ func open(args map[string]interface{}) (conn db.Connection, err os.Error) {
 	var host, uname, passwd, dbname, socket *C.char;
 	var port C.uint;
 
+	// Local helper function to unpack a CString from the passed in dictionary
+	// arguments
+	cstringFromMap := func(d map[string]interface{}, key string) (s *C.char) {
+		if v, f := d[key]; f { if v, f := v.(string); f { s = C.CString(v) } }
+		return;
+	};
+
 	host = cstringFromMap(args, "host");
-	port = cuintFromMap(args, "port");
 	socket = cstringFromMap(args, "socket");
+
+	// Unpack a uint from the dictionary
+	if v, f := args["port"]; f { if s, f := v.(int); f { port = C.uint(s) } }
 
 	if socket == nil && host == nil {
 		err = MysqlError("Either 'host' or 'socket' must be defined in args");
@@ -198,31 +182,6 @@ func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 func (conn Connection) Lock()		{ conn.lock.Lock() }
 func (conn Connection) Unlock()	{ conn.lock.Unlock() }
 
-type BoundData struct {
-	buffer	[]byte;
-	blen	uint64;
-	is_null	[1]byte;
-	error	[1]byte;
-}
-
-const (
-	MysqlTypeDecimal = iota;
-	MysqlTypeTiny;
-	MysqlTypeShort;
-	MysqlTypeLong;
-	MysqlTypeFloat;
-	MysqlTypeDouble;
-	MysqlTypeNull;
-	MysqlTypeTimestamp;
-	MysqlTypeLongLong;
-	MysqlTypeInt24;
-	MysqlTypeDate;
-	MysqlTypeTime;
-	MysqlTypeDateTime;
-	MysqlTypeYear;
-	MysqlTypeNewDate;
-	MysqlTypeVarChar;
-)
 
 func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.Error) {
 	a := reflect.NewValue(args).(*reflect.StructValue);
@@ -239,16 +198,16 @@ func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.E
 
 			case *reflect.StringValue:
 				s := arg.Get();
-				data[i] = BoundData{};
-				data[i].buffer = strings.Bytes(s);
-				data[i].blen = uint64(len(s));
-				data[i].is_null = [1]byte{0};
-				data[i].error = [1]byte{0};
+
+				data[i] = *NewBoundData(
+					MysqlTypeString,
+					strings.Bytes(s),
+					len(s));
 
 				C.assign_bind(
 					binds,
 					C.uint(i),
-					MysqlTypeVarChar,
+					MysqlTypeString,
 					unsafe.Pointer(&data[i].buffer),
 					C.ulong(len(s)),
 					unsafe.Pointer(&data[i].blen),
@@ -265,7 +224,7 @@ func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.E
 	return;
 }
 
-func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, []BoundData) {
+func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, *[]BoundData) {
 	meta := C.mysql_stmt_result_metadata(stmt);
 	if meta != nil {
 		fcount := C.mysql_num_fields(meta);
@@ -274,11 +233,11 @@ func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, []BoundData) {
 		for i := C.uint(0); i < fcount; i+=1 {
 			field := C.mysql_fetch_field_direct(meta, i);
 
-			data[i] = BoundData{};
-			data[i].buffer = make([]byte, field.length);
-			data[i].blen = 0;
-			data[i].is_null = [1]byte{0};
-			data[i].error = [1]byte{0};
+			data[i] = *NewBoundData(
+				MysqlType(field._type),
+				nil,
+				int(field.length)
+			);
 
 			C.assign_bind(
 				binds, i,
@@ -290,7 +249,7 @@ func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, []BoundData) {
 				unsafe.Pointer(&data[i].error));
 		}
 		C.mysql_free_result(meta);
-		return binds, data;
+		return binds, &data;
 	}
 	return nil, nil
 }
@@ -322,9 +281,7 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...)
 			err = conn.LastError()
 		}
 		else {
-			cur := Cursor{};
-			cur.stmt = &s;
-			dbcur = cur
+			dbcur = NewCursorValue(s)
 		}
 
 		if binds != nil {
@@ -362,8 +319,16 @@ func (s Statement) Close() (err os.Error) {
 type Cursor struct {
 	stmt	*Statement;
 	rbinds	*C.MYSQL_BIND;
-	rdata	[]BoundData;
+	rdata	*[]BoundData;
 	bound	bool;
+}
+
+func NewCursorValue(s Statement) (Cursor) {
+	cur := Cursor{};
+	cur.stmt = &s;
+	cur.bound = false;
+	(&cur).setupResultBinds();
+	return cur
 }
 
 func (c Cursor) MoreResults() bool {
@@ -383,14 +348,15 @@ func (c *Cursor) setupResultBinds() (err os.Error) {
 }
 
 func (c Cursor) FetchOne() (res []interface{}, err os.Error) {
-	c.setupResultBinds();
+	fmt.Printf("BOUND:%v RBINDS:0x%x RDATA:0x%x\n",
+		c.bound,
+		uintptr(unsafe.Pointer(c.rbinds)),
+		uintptr(unsafe.Pointer(c.rdata)));
 
 	if rc := C.mysql_stmt_fetch(c.stmt.stmt); rc == 0 {
-		res = make([]interface{}, len(c.rdata));
-		for i := range(c.rdata) {
-			res[i] = C.GoString(C.effit(
-				unsafe.Pointer(&c.rdata[i].buffer),
-				C.int(c.rdata[i].blen)))
+		res = make([]interface{}, len(*c.rdata));
+		for i := range(*c.rdata) {
+			res[i], _ = (*c.rdata)[i].Value()
 		}
 	}
 	else if rc == 100 {
