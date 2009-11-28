@@ -21,23 +21,23 @@ Example
 Synopsis
 --------
 
-    conn := mysql.NewConn();
-    err := conn.Connect(&mysql.ConnInfo{host, port, user, pass, dbname});
-    if err != nil { panic("Connect error") }
+    conn, err := mysql.Open(map[string]interface{} {
+      "host": "127.0.0.1",
+      "port": 3306,
+      "username": "root"
+    });
+    if err != nil { panic("Connect error:", err) }
 
-    cur := conn.Cursor();
-    cur.Execute("SELECT * FROM table");
-    tuple, err := cur.FetchOne();
-    for ; err == nil && tuple != nil; tuple, err = cur.FetchOne() {
-      fmt.Println(tuple)
+    stmt, serr := conn.Prepare("SELECT * FROM table");
+    if serr != nil { panic("Prepare error:", serr) }
+
+    cur, cerr := conn.Execute(stmt);
+    if cerr != nil { panic("Execute error:", cerr) }
+
+    for t, _ := cur.FetchOne(); t != nil; t, _ = cur.FetchOne() {
+      fmt.Println(t)
     }
 
     cur.Close();
+    stmt.Close();
     conn.Close();
-
-TODO
-----
-- Proper type conversion.  Right now all values are returned as strings.
-- More tests.
-- Better documentation.
-- Connection pools?
