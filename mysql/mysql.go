@@ -348,11 +348,6 @@ func (c *Cursor) setupResultBinds() (err os.Error) {
 }
 
 func (c Cursor) FetchOne() (res []interface{}, err os.Error) {
-	fmt.Printf("BOUND:%v RBINDS:0x%x RDATA:0x%x\n",
-		c.bound,
-		uintptr(unsafe.Pointer(c.rbinds)),
-		uintptr(unsafe.Pointer(c.rdata)));
-
 	if rc := C.mysql_stmt_fetch(c.stmt.stmt); rc == 0 {
 		res = make([]interface{}, len(*c.rdata));
 		for i := range(*c.rdata) {

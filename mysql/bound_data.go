@@ -90,6 +90,7 @@ func (d *BoundData) Value() (v interface {}, ok bool) {
 	case MysqlTypeLong:
 		if len(bytes) == 4 { v, ok = binary.LittleEndian.Uint32(bytes), true }
 
+	case MysqlTypeVarString: fallthrough;
 	case MysqlTypeVarchar: fallthrough;
 	case MysqlTypeString:
 		v = string(bytes);
@@ -130,7 +131,6 @@ func (d *BoundData) Value() (v interface {}, ok bool) {
 	case MysqlTypeBit: fallthrough;
 	case MysqlTypeEnum: fallthrough;
 	case MysqlTypeSet: fallthrough;
-	case MysqlTypeVarString: fallthrough;
 	case MysqlTypeGeometry:
 		v = bytes;
 		ok = true
