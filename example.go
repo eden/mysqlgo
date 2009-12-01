@@ -48,9 +48,8 @@ func main() {
 		os.Exit(1)
 	}
 
-
 	fmt.Println("Creating temporary table __hello");
-	stmt, e := conn.Prepare("CREATE TEMPORARY TABLE __hello (i VARCHAR(255))");
+	stmt, e := conn.Prepare("CREATE TEMPORARY TABLE __hello (i FLOAT)");
 	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
 
 	_, err = conn.Execute(stmt);

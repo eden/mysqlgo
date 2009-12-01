@@ -6,6 +6,7 @@ GOFILES=const.go bound_data.go
 MYSQL_CONFIG=$(shell which mysql_config)
 CGO_CFLAGS=$(shell $(MYSQL_CONFIG) --cflags)
 CGO_LDFLAGS=$(shell $(MYSQL_CONFIG) --libs)
+CLEANFILES=ex
 
 include $(GOROOT)/src/Make.pkg
 

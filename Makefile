@@ -14,6 +14,9 @@ mysql_install: mysql/Makefile
 
 install: prereq db_install mysql_install
 
+test:
+	cd mysql; make test
+
 example: install example.go
 	$(GC) example.go
 	$(LD) -o $@ example.$O

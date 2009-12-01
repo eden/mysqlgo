@@ -7,7 +7,6 @@ package mysql
 
 import (
 	"unsafe";
-	"encoding/binary";
 )
 
 type BoundData struct {
@@ -26,7 +25,7 @@ func NewBoundData(t MysqlType, buf []byte, n int) (data *BoundData) {
 		buffer: buf,
 		blen: correctSize(t, n)
 	};
-	if buf == nil && n > 0 {
+	if buf == nil {
 		data.buffer = make([]byte, data.blen);
 	}
 	return;
@@ -46,7 +45,7 @@ func correctSize(t MysqlType, n int) (sz int) {
 
 	case MysqlTypeInt24: fallthrough
 	case MysqlTypeLong:
-		sz = unsafe.Sizeof(int32(0))
+		sz = unsafe.Sizeof(int(0))
 
 	case MysqlTypeLonglong:
 		sz = unsafe.Sizeof(int64(0))
@@ -82,38 +81,35 @@ func (d *BoundData) Value() (v interface {}, ok bool) {
 		return nil, true
 	}
 
-	// TODO remove this once it becomes clear why d.buffer[0] segfaults
-	bytes := bytesForUnsafePointer(unsafe.Pointer(&d.buffer), d.blen);
+	ptr := unsafe.Pointer(&d.buffer[0]);
 	ok = false;
 
 	switch(d.myType) {
-	case MysqlTypeLong:
-		if len(bytes) == 4 { v, ok = binary.LittleEndian.Uint32(bytes), true }
 
 	case MysqlTypeVarString: fallthrough;
 	case MysqlTypeVarchar: fallthrough;
 	case MysqlTypeString:
-		v = string(bytes);
-		ok = true
+		v, ok = platformConvertString(ptr, d.blen), true
 
 	case MysqlTypeTiny:
-		if len(bytes) == 1 { v, ok = bytes[0], true }
+		if d.blen == 1 { v, ok = platformConvertTiny(ptr), true }
 
 	case MysqlTypeShort:
-		if len(bytes) == 2 { v, ok = binary.LittleEndian.Uint16(bytes), true }
+		if d.blen == 2 { v, ok = platformConvertShort(ptr), true }
+
+	case MysqlTypeLong:
+		if d.blen == 4 { v, ok = platformConvertLong(ptr), true }
 
 	case MysqlTypeLonglong:
-		if len(bytes) == 8 { v, ok = binary.LittleEndian.Uint64(bytes), true }
+		if d.blen == 8 { v, ok = platformConvertLonglong(ptr), true }
+
+	case MysqlTypeFloat:
+		if d.blen == 4 { v, ok = platformConvertFloat(ptr), true }
 
 	case MysqlTypeNewdecimal: fallthrough;
 	case MysqlTypeDecimal: fallthrough;
-		//v, ok = i.(float64)
-
-	case MysqlTypeFloat: fallthrough;
-		//v, ok = i.(float)
-
-	case MysqlTypeDouble: fallthrough;
-		//v, ok = i.(float64)
+	case MysqlTypeDouble:
+		if d.blen == 8 { v, ok = platformConvertDouble(ptr), true }
 
 	case MysqlTypeTinyBlob: fallthrough;
 	case MysqlTypeMedium_Blob: fallthrough;
@@ -132,7 +128,7 @@ func (d *BoundData) Value() (v interface {}, ok bool) {
 	case MysqlTypeEnum: fallthrough;
 	case MysqlTypeSet: fallthrough;
 	case MysqlTypeGeometry:
-		v = bytes;
+		v = bytesForUnsafePointer(ptr, d.blen);
 		ok = true
 	}
 

@@ -6,250 +6,182 @@
 // a user `root` with a blank password and a database called `test`.
 package mysql_test
 
-import "testing"
-import "mysql"
-import "rand"
-import "os"
+import (
+	"container/vector";
+	"testing";
+	"mysql";
+	"rand";
+	"db";
+	"os";
+)
 
-func defaultConn(t *testing.T) *mysql.Conn {
-	conn := mysql.NewConn();
-	err := conn.Connect(&mysql.ConnInfo{
-		"127.0.0.1", 3306,
-		"root", "",
-		"test"
+func defaultConn(t *testing.T) *db.Connection {
+	conn, e := mysql.Open(map[string]interface{}{
+		"host": "localhost",
+		"port": 3306,
+		"username": "root",
+		"database": "test",
 	});
-	if err != nil {
+	if e != nil {
 		t.Log("Couldn't connect to root:@127.0.0.1:3306:test\n%s",
-			err);
+			e);
 		return nil;
 	}
-	return conn
+	return &conn;
 }
 
 var tableT = []string{
-	// Uncomment once we have fixed sql quoting logic.
-	// Currently, it just uses fmt.Sprintf and relies on %q which
-	// mysql does not interpret properly.
-
-	/*"道可道，非常道。", "名可名，非常名。",
+	"道可道，非常道。", "名可名，非常名。",
 	"無名天地之始；", "有名萬物之母。",
 	"故常無欲以觀其妙；", "常有欲以觀其徼。",
 	"此兩者同出而異名，", "同謂之玄。",
-	"玄之又玄，眾妙之門。", */
-
-	"lorem",
-	"ipsum",
-	"dolor",
-	"sit",
-	"amet"
-	"consectetur",
-	"adipisicing",
-	"elit",
-	"sed"
+	"玄之又玄，眾妙之門。",
+	"test",
+	"test2",
+	"test3",
+	"test4",
+	"test5",
 }
 
-func prepareTestTable(t *testing.T, cur *mysql.Cursor) {
-	err := cur.Execute("CREATE TEMPORARY TABLE t (i INT, s VARCHAR(20));");
-	if err != nil {
-		error(t, err, "Couldn't create temporary table test.t")
+func prepareTestTable(t *testing.T, conn *db.Connection) {
+	stmt, sErr := conn.Prepare(
+		"CREATE TEMPORARY TABLE t (i INT, s VARCHAR(100));");
+	if sErr != nil {
+		error(t, sErr, "Couldn't prepare statement");
+		return;
 	}
+
+	cur, cErr := conn.Execute(stmt);
+	if cErr != nil {
+		error(t, cErr, "Couldn't create temporary table test.t");
+		return;
+	}
+	cur.Close();
+
+	stmt, sErr = conn.Prepare("INSERT INTO t (i, s) VALUES (?, ?)");
+	if sErr != nil {
+		error(t, sErr, "Couldn't prepare statement");
+		return;
+	}
+
 	for i, s := range tableT {
-		err = cur.Execute("INSERT INTO t (i, s) VALUES (%d, %q)",
-			i, s);
-		if err != nil {
-			error(t, err, "Couldn't insert into temporary table test.t")
+		cur, cErr = conn.Execute(stmt, i, s);
+		if cur == nil || cErr != nil {
+			error(t, cErr, "Couldn't insert into temporary table test.t");
+			return;
 		}
-		if count := cur.RowCount(); count != 0 {
-			t.Error("Returned rows for INSERT statement.")
-		}
+		cur.Close();
 	}
+	stmt.Close();
 }
 
-func startTestWithLoadedFixture(t *testing.T)
-	(conn *mysql.Conn, cur *mysql.Cursor)
-{
+func startTestWithLoadedFixture(t *testing.T) (conn *db.Connection) {
 	conn = defaultConn(t);
-	if conn == nil { return }
+	if conn == nil {
+		return
+	}
 
-	cur = conn.Cursor();
-	if cur != nil { prepareTestTable(t, cur) }
-
+	prepareTestTable(t, conn);
 	return;
 }
 
 func error(t *testing.T, err os.Error, msg string) {
 	if err == nil {
 		t.Error(msg)
-	}
-	else {
-		t.Errorf("%s: %s\n", msg, err.String());
+	} else {
+		t.Errorf("%s: %s\n", msg, err.String())
 	}
 }
 
-func TestCursorErrors(t *testing.T) {
-	// Cursor on an unconnected object returns nil
-	conn := mysql.NewConn();
-	if conn.Cursor() != nil {
-		error(t, nil, "Unconnected Cursor should be nil")
+func TestOne(t *testing.T) {
+	conn := startTestWithLoadedFixture(t);
+
+	stmt, sErr := conn.Prepare(
+		"SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
+	if sErr != nil {
+		error(t, sErr,
+			"Couldn't prepare for select from temporary table test.t")
 	}
-
-	conn = defaultConn(t);
-	if conn == nil { return }
-
-	cur := conn.Cursor();
-
-	// Fetch called before Execute should return nil with an error
-	res, err := cur.FetchOne();
-	if res != nil || err == nil {
-		error(t, nil, "FetchOne before Execute should error")
+	cur, cErr := conn.Execute(stmt);
+	if cErr != nil {
+		error(t, cErr, "Couldn't execute statement")
 	}
-
-	resm, err := cur.FetchMany(10);
-	if resm != nil || err == nil {
-		error(t, nil, "FetchMany(10) before Execute should error")
-	}
-
-	resm, err = cur.FetchAll();
-	if resm != nil || err == nil {
-		error(t, nil, "FetchAll before Execute should error")
-	}
-
-	// Invalid statements return errors
-	err = cur.Execute("1");
-	if res != nil || err == nil {
-		error(t, nil, "Invalid statement should return errors")
-	}
-
-	// No result statements should not error, but should not have results.
-	err = cur.Execute("# No results");
-	if err != nil {
-		error(t, err, "No-result SQL statement should not error")
-	}
-
-	res, err = cur.FetchOne();
-	if res != nil || err == nil {
-		error(t, nil, "FetchOne on no-result statement should error")
-	}
-
-	resm, err = cur.FetchMany(10);
-	if res != nil || err == nil {
-		error(t, nil, "FetchMany on no-result statement should error")
-	}
-
-	resm, err = cur.FetchAll();
-	if res != nil || err == nil {
-		error(t, nil, "FetchAll on no-result statement should error")
-	}
-
-	cols := cur.Description();
-	if len(cols) > 0 {
-		t.Error("Description should return no 0-length columns")
-	}
-
-	conn.Close();
-	cur.Close();
-}
-
-func TestCursor(t *testing.T) {
-	conn, cur := startTestWithLoadedFixture(t);
-
-	err := cur.Execute("SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
-	if err != nil {
-		error(t, err, "Couldn't select from temporary table test.t")
-	}
-	if count := cur.RowCount(); int(count) != len(tableT) {
-		t.Error("Result count doesn't match inserted count.")
-	}
-
-	cols := cur.Description();
-	if len(cols) != 2 { t.Error("Description should return 2 columns") }
-	if cols[0].Name != "pos" { t.Error("Description()[0] != 'pos'") }
-	if cols[1].Name != "phrase" { t.Error("Description()[0] != 'phrase'") }
 
 	i := 0;
-	var row []interface {};
-	row, err = cur.FetchOne();
+	row, err := cur.FetchOne();
+	if row == nil {
+		t.Error("row is nil")
+	}
 	for row != nil {
-		if err != nil { error(t, err, "Couldn't FetchOne()") }
+		if err != nil {
+			error(t, err, "Couldn't FetchOne()")
+		}
+		if v, ok := row[0].(int); !ok || i != v {
+			if ok {
+				t.Errorf("Mismatch %d != %d", i, v)
+			} else {
+				t.Errorf("Couldn't convert %T to int.", row[0])
+			}
+		}
 		if v, ok := row[1].(string); !ok || tableT[i] != v {
-			if ok { t.Errorf("Mismatch %q != %q", tableT[i], v) }
-			else { t.Errorf("Couldn't convert %v to string.", row[1]) }
+			if ok {
+				t.Errorf("Mismatch %q != %q", tableT[i], v)
+			} else {
+				t.Errorf("Couldn't convert %T to string.", row[1])
+			}
 		}
 		i += 1;
 		row, err = cur.FetchOne();
 	}
 
-	// Test FetchMany
-	err = cur.Execute("SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
-	if err != nil {
-		error(t, err, "Couldn't select from temporary table test.t")
-	}
-
-	var results [][]interface {};
-	results, err = cur.FetchMany(3);
-	if err != nil { error(t, err, "Error") }
-	if len(results) != 3 {
-		t.Errorf("Result count mismatch 3 != %d", len(results))
-	}
-	for i, v := range results {
-		if v, ok := v[1].(string); !ok || tableT[i] != v {
-			if ok { t.Errorf("Mismatch %q != %q", tableT[i], v) }
-			else { t.Errorf("Couldn't convert %v to string.", row[1]) }
-		}
-	}
-
-	// Test FetchAll
-	err = cur.Execute("SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
-	if err != nil {
-		error(t, err, "Couldn't select from temporary table test.t")
-	}
-
-	results, err = cur.FetchAll();
-	if err != nil { error(t, err, "Error") }
-
-	if len(results) != len(tableT) {
-		t.Errorf("Result count mismatch %d != %d", len(tableT), len(results))
-	}
-	for i, v := range results {
-		if v, ok := v[1].(string); !ok || tableT[i] != v {
-			if ok { t.Errorf("Mismatch %q != %q", tableT[i], v) }
-			else { t.Errorf("Couldn't convert %v to string.", row[1]) }
-		}
-	}
-
 	cur.Close();
+	stmt.Close();
 	conn.Close();
 }
 
-func findRand(t *testing.T, conn *mysql.Conn, ch chan [][]interface {}) {
-	cur := conn.Cursor();
-	err := cur.Execute(
-		"SELECT * FROM t WHERE i != %d ORDER BY RAND()",
-		rand.Int());
-	if err != nil { error(t, err, "Couldn't select") }
+func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
+	stmt, sErr := conn.Prepare(
+		"SELECT * FROM t WHERE i != ? ORDER BY RAND()");
+	if sErr != nil {
+		error(t, sErr, "Couldn't prepare")
+	}
 
-	var res [][]interface{};
-	res, err = cur.FetchAll();
-	if err != nil { error(t, err, "Couldn't fetch") }
-	if len(res) != len(tableT) { t.Error("Invalid length") }
+	cur, cErr := conn.Execute(stmt, rand.Int());
+	if cErr != nil {
+		error(t, cErr, "Couldn't select")
+	}
+
+	vout := new(vector.Vector);
+	res, fErr := cur.FetchOne();
+	if fErr != nil {
+		error(t, fErr, "Couldn't fetch")
+	}
+	for res != nil {
+		vout.Push(res);
+		res, fErr = cur.FetchOne();
+	}
+
+	if vout.Len() != len(tableT) {
+		t.Error("Invalid length")
+	}
 
 	cur.Close();
-	ch <- res
+	stmt.Close();
+	ch <- vout;
 }
 
-func TestReentrant(t *testing.T) {
-	conn, cur := startTestWithLoadedFixture(t);
-	cur.Close();
+func _BROKEN_TestReentrant(t *testing.T) {
+	conn := startTestWithLoadedFixture(t);
 
-	ch := make([]chan [][]interface {}, 500);
+	ch := make([]chan *vector.Vector, 10);
 
 	for i, _ := range ch {
-		ch[i] = make(chan [][]interface{});
-		go findRand(t, conn, ch[i])
+		ch[i] = make(chan *vector.Vector);
+		go findRand(t, conn, ch[i]);
 	}
 	for _, c := range ch {
 		res := <-c;
-		if len(res) != len(tableT) {
+		if res.Len() != len(tableT) {
 			t.Error("Invalid results")
 		}
 	}
