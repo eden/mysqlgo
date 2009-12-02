@@ -139,6 +139,73 @@ func TestOne(t *testing.T) {
 	conn.Close();
 }
 
+func prepareEmpty(t *testing.T, conn *db.Connection, ch chan int) {
+	stmt, sErr := conn.Prepare(
+		"SELECT * FROM t ORDER BY RAND()");
+	if sErr != nil {
+		error(t, sErr, "Couldn't prepare")
+	}
+	stmt.Close();
+	ch <- 1;
+}
+
+func TestReentrantPrepare(t *testing.T) {
+	conn := startTestWithLoadedFixture(t);
+
+	ch := make([]chan int, 100);
+
+	for i, _ := range ch {
+		ch[i] = make(chan int);
+		go prepareEmpty(t, conn, ch[i]);
+	}
+	for _, c := range ch {
+		<-c;
+	}
+
+	conn.Close();
+}
+
+func execute(t *testing.T, conn *db.Connection, stmt *db.Statement, ch chan int) {
+	cur, cErr := conn.Execute(*stmt, rand.Int());
+	if cErr != nil {
+		error(t, cErr, "Couldn't select")
+	}
+	res, fErr := cur.FetchOne();
+	if fErr != nil {
+		error(t, fErr, "Couldn't fetch")
+	}
+	for res != nil {
+		res, fErr = cur.FetchOne();
+		if fErr != nil {
+			error(t, fErr, "Couldn't fetch")
+		}
+	}
+	cur.Close();
+	ch <- 1;
+}
+
+func TestReentrantExecute(t *testing.T) {
+	conn := startTestWithLoadedFixture(t);
+	stmt, sErr := conn.Prepare(
+		"SELECT * FROM t ORDER BY RAND()");
+	if sErr != nil {
+		error(t, sErr, "Couldn't prepare")
+	}
+
+	ch := make([]chan int, 1);
+
+	for i, _ := range ch {
+		ch[i] = make(chan int);
+		go execute(t, conn, &stmt, ch[i]);
+	}
+	for _, c := range ch {
+		<-c
+	}
+
+	stmt.Close();
+	conn.Close();
+}
+
 func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 	stmt, sErr := conn.Prepare(
 		"SELECT * FROM t WHERE i != ? ORDER BY RAND()");
@@ -170,7 +237,7 @@ func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 	ch <- vout;
 }
 
-func _BROKEN_TestReentrant(t *testing.T) {
+func TestPrepareExecuteReentrant(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
 
 	ch := make([]chan *vector.Vector, 10);

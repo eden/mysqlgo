@@ -209,6 +209,7 @@ func (conn Connection) LastError() os.Error {
 func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 	s := Statement{};
 	s.conn = &conn;
+	conn.Lock();
 	s.stmt = C.mysql_stmt_init(conn.handle);
 	if s.stmt == nil {
 		e = MysqlError("Prepare: Couldn't init statement (out of memory?)");
@@ -224,6 +225,7 @@ func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 	} else {
 		dbs = s
 	}
+	conn.Unlock();
 
 	return;
 }
@@ -333,7 +335,6 @@ func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, *[]BoundData) {
 func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Cursor, err os.Error) {
 	dbcur = nil;
 
-	conn.Lock();
 	if s, ok := stmt.(Statement); ok {
 		var (
 			binds	*C.MYSQL_BIND = nil;
@@ -357,6 +358,7 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 			data = data;
 		}
 
+		conn.Lock();
 		if rc := C.mysql_stmt_execute(s.stmt); rc != 0 {
 			err = conn.LastError()
 		}
@@ -373,11 +375,11 @@ cleanup:
 		if binds != nil {
 			C.free(unsafe.Pointer(binds))
 		}
+		conn.Unlock();
 	} else {
 		err = MysqlError("Execute: 'stmt' is not a mysql.Statement")
 	}
 
-	conn.Unlock();
 	return;
 }
 
