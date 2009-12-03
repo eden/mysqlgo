@@ -13,7 +13,3 @@ include $(GOROOT)/src/Make.pkg
 prereq:
 	@test -x "$(MYSQL_CONFIG)" || \
 		(echo "Can't find mysql_config in your path."; false)
-
-ex: install ex.go
-	$(GC) ex.go
-	$(LD) -o $@ ex.$O
