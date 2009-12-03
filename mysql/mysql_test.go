@@ -257,3 +257,39 @@ func TestPrepareExecuteReentrant(t *testing.T) {
 		conn.Close();
 	}
 }
+
+func TestExecuteDirectly(t *testing.T) {
+	var (
+		conn db.FancyConnection;
+		ok bool;
+	)
+
+	c := *startTestWithLoadedFixture(t);
+	if conn, ok = c.(db.FancyConnection); !ok {
+		t.Error("mysql.Connection does not assert as db.FancyConnection");
+	}
+
+	cur, err := conn.ExecuteDirectly(
+		"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC",
+		123);
+	if err != nil { error(t, err, "Couldn't ExecuteDirectly") }
+
+	for row, _ := cur.FetchOne(); row != nil; row, _ = cur.FetchOne() {
+		var pos int;
+
+		if i := row[0].(int); i != 123 {
+			t.Error("Invalid parameter bind in result");
+		}
+		if pos = row[1].(int); pos < 0 || pos >= len(tableT) {
+			t.Error("Invalid result bind pos (1)");
+		}
+		else {
+			if str := row[2].(string); tableT[pos] != str {
+				t.Error("Invalid result bind phrase (2)",
+					str, "!=", tableT[pos]);
+			}
+		}
+	}
+	cur.Close();
+	conn.Close();
+}

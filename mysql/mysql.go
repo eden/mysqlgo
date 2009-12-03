@@ -386,6 +386,21 @@ cleanup:
 	return;
 }
 
+func (conn Connection) ExecuteDirectly(query string, parameters ...)
+	(dbcur *db.Cursor, err os.Error)
+{
+	var (stmt db.Statement; cur db.Cursor);
+	dbcur = nil;
+	stmt, err = conn.Prepare(query);
+	if err == nil {
+		cur, err = conn.Execute(stmt, parameters);
+		if err == nil {
+			dbcur = &cur;
+		}
+	}
+	return;
+}
+
 // Closes and cleans up the connection.
 func (conn Connection) Close() os.Error {
 	C.mysql_close(conn.handle);
