@@ -238,20 +238,22 @@ func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 }
 
 func TestPrepareExecuteReentrant(t *testing.T) {
-	conn := startTestWithLoadedFixture(t);
+	for j := 0; j < 10; j++ {
+		conn := startTestWithLoadedFixture(t);
 
-	ch := make([]chan *vector.Vector, 10);
+		ch := make([]chan *vector.Vector, 100);
 
-	for i, _ := range ch {
-		ch[i] = make(chan *vector.Vector);
-		go findRand(t, conn, ch[i]);
-	}
-	for _, c := range ch {
-		res := <-c;
-		if res.Len() != len(tableT) {
-			t.Error("Invalid results")
+		for i, _ := range ch {
+			ch[i] = make(chan *vector.Vector);
+			go findRand(t, conn, ch[i]);
 		}
-	}
+		for _, c := range ch {
+			res := <-c;
+			if res.Len() != len(tableT) {
+				t.Error("Invalid results")
+			}
+		}
 
-	conn.Close();
+		conn.Close();
+	}
 }

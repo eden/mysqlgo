@@ -209,13 +209,17 @@ func (conn Connection) LastError() os.Error {
 func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 	s := Statement{};
 	s.conn = &conn;
+
 	conn.Lock();
 	s.stmt = C.mysql_stmt_init(conn.handle);
+	conn.Unlock();
+
 	if s.stmt == nil {
 		e = MysqlError("Prepare: Couldn't init statement (out of memory?)");
 		return;
 	}
 
+	conn.Lock();
 	cquery := strings.Bytes(query);
 	if r := C.mysql_stmt_prepare(
 		s.stmt, (*C.char)(unsafe.Pointer(&cquery[0])), C.ulong(len(query)));
@@ -230,9 +234,8 @@ func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 	return;
 }
 
-func (conn Connection) Lock()	{ conn.lock.Lock() }
-func (conn Connection) Unlock()	{ conn.lock.Unlock() }
-
+func (conn Connection) Lock() { conn.lock.Lock() }
+func (conn Connection) Unlock() { conn.lock.Unlock() }
 
 func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.Error) {
 	a := reflect.NewValue(args).(*reflect.StructValue);
@@ -333,8 +336,8 @@ func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, *[]BoundData) {
 }
 
 func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Cursor, err os.Error) {
-	dbcur = nil;
 
+	dbcur = nil;
 	if s, ok := stmt.(Statement); ok {
 		var (
 			binds	*C.MYSQL_BIND = nil;
@@ -463,7 +466,9 @@ func (c Cursor) FetchAll() (res [][]interface{}, err os.Error) {
 
 func (c Cursor) Close() (err os.Error) {
 	if c.rbinds != nil {
+		c.stmt.conn.Lock();
 		C.mysql_bind_free(c.rbinds);
+		c.stmt.conn.Unlock();
 		c.rbinds = nil;
 	}
 	c.rdata = nil;
