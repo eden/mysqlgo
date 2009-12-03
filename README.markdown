@@ -2,7 +2,14 @@ MySQL Bindings for Go (golang)
 ==============================
 
 Implements rudimentary MySQL support for Go via libmysql.  The interface
-vaguely follows [Python's PEP 249](http://www.python.org/dev/peps/pep-0249/).
+follows Peter Froehlich's [database
+interface](http://github.com/phf/go-sqlite/blob/master/db.go).  This is
+automatically included via a git submodule.
+
+Currently, it is possible to share a single connection with multiple
+goroutines.  Note, however, that locks are used for certain libmysql calls due
+to the thread-sensitvity of those calls.
+
 The `Makefile` assumes `mysql_config` is in your path.
 
 Install
@@ -28,16 +35,27 @@ Synopsis
     });
     if err != nil { panic("Connect error:", err) }
 
-    stmt, serr := conn.Prepare("SELECT * FROM table");
-    if serr != nil { panic("Prepare error:", serr) }
+	fconn := conn.(db.FancyConnection);
 
-    cur, cerr := conn.Execute(stmt);
-    if cerr != nil { panic("Execute error:", cerr) }
+    cur, serr := fconn.ExecuteDirectly("SELECT * FROM table");
+    if serr != nil { panic("ExecuteDirectly error:", serr) }
 
     for t, _ := cur.FetchOne(); t != nil; t, _ = cur.FetchOne() {
       fmt.Println(t)
     }
 
     cur.Close();
-    stmt.Close();
     conn.Close();
+
+TODO
+====
+
+ * Better parameter type support (right now only int and strings can be bound
+   as parameters in `Prepare` and `ExecuteDirectly`).
+ * `DATE`, `TIME` and `DATETIME` support.
+ * Implement `TransactionalConnection` methods
+ * Implement `InformativeCursor` methods
+ * Implement `PythonicCursor` methods
+ * Implement `FetchMany` and `FetchAll`
+ * More exhaustive testing.  Most of the main methods are tested, but the test
+   code needs some refactoring for clarity.

@@ -3,8 +3,10 @@ package main
 import (
 	"mysql";
 	"flag";
+	"rand";
 	"fmt";
 	"os";
+	"db";
 )
 
 var (
@@ -40,6 +42,7 @@ func main() {
 		"pass": pass,
 		"database": dbname
 	});
+	fconn := conn.(db.FancyConnection);
 
 	if err != nil {
 		fmt.Printf("Error connecting to %s:%d: %s\n",
@@ -47,32 +50,33 @@ func main() {
 		flag.Usage();
 		os.Exit(1)
 	}
+	var stmt db.Statement;
 
 	fmt.Println("Creating temporary table __hello");
-	stmt, e := conn.Prepare("CREATE TEMPORARY TABLE __hello (i FLOAT)");
+	_, e := fconn.ExecuteDirectly("CREATE TEMPORARY TABLE __hello (i INT)");
 	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
-
-	_, err = conn.Execute(stmt);
-	if err != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
-	stmt.Close();
 
 	fmt.Println("Inserting 100 random numbers");
-	stmt, e = conn.Prepare("INSERT INTO __hello (i) VALUE (1000*RAND())");
-	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+	stmt, e = conn.Prepare("INSERT INTO __hello (i) VALUE (?)");
+	if e != nil { fmt.Printf("Error: %s\n", err); os.Exit(1); }
 
 	for i := 0; i < 100; i+=1 {
-		_, err = conn.Execute(stmt);
-		if err != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+		_, err = conn.Execute(stmt, rand.Int());
+		if err != nil { fmt.Printf("Error: %s\n", err); os.Exit(1); }
 	}
 	stmt.Close();
 
 	fmt.Println("Reading numbers in lexical order");
 	stmt, e = conn.Prepare("SELECT i FROM __hello ORDER BY i ASC");
-	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+	if e != nil { fmt.Printf("Error: %s\n", err); os.Exit(1); }
 
 	cur, _ := conn.Execute(stmt);
 	for t, _ := cur.FetchOne(); t != nil; t, _ = cur.FetchOne() {
-		fmt.Printf("%#v\n", t)
+		if v, ok := t[0].(int); ok {
+			fmt.Printf("%d\n", v)
+		} else {
+			fmt.Printf("Error converting %T to int\n", v)
+		}
 	}
 	cur.Close();
 	stmt.Close();
