@@ -398,6 +398,7 @@ func (conn Connection) ExecuteDirectly(query string, parameters ...)
 			dbcur = &cur;
 		}
 	}
+	stmt.Close();
 	return;
 }
 
