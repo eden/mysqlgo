@@ -6,6 +6,9 @@ prereq:
 	@test -x "$(MYSQL_CONFIG)" || \
 		(echo "Can't find mysql_config in your path."; false)
 
+db/Makefile:
+	git submodule update --init
+
 db_install: db/Makefile
 	cd db; make install
 

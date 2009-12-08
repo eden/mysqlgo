@@ -1,8 +1,8 @@
 MySQL Bindings for Go (golang)
 ==============================
 
-Implements rudimentary MySQL support for Go via libmysql.  The interface
-follows Peter Froehlich's [database
+Implements MySQL support for Go via libmysql.  The interface follows Peter
+Froehlich's [database
 interface](http://github.com/phf/go-sqlite/blob/master/db.go).  This is
 automatically included via a git submodule.
 
@@ -11,19 +11,6 @@ goroutines.  Note, however, that locks are used for certain libmysql calls due
 to the thread-sensitvity of those calls.
 
 The `Makefile` assumes `mysql_config` is in your path.
-
-Install
--------
-
-    cd mysqlgo
-    make install
-
-Example
--------
-
-    cd mysqlgo
-    make example
-    ./example -host=127.0.0.1 -user=root -dbname=test
 
 Synopsis
 --------
@@ -35,17 +22,26 @@ Synopsis
     });
     if err != nil { panic("Connect error:", err) }
 
-	fconn := conn.(db.FancyConnection);
+    stmt, serr := conn.Prepare("SELECT * FROM table WHERE name LIKE ?");
+    if serr != nil { panic("Prepare error:", serr) }
 
-    cur, serr := fconn.ExecuteDirectly("SELECT * FROM table");
-    if serr != nil { panic("ExecuteDirectly error:", serr) }
+    ch, cerr := conn.Iterate(stmt, "George%");
+    if cerr != nil { panic("Iterate error:", cerr) }
 
-    for t, _ := cur.FetchOne(); t != nil; t, _ = cur.FetchOne() {
-      fmt.Println(t)
+    for result := range ch {
+      data := result.Data();
+      fmt.Println(data)
     }
 
-    cur.Close();
     conn.Close();
+
+Install/Run Example
+-------------------
+
+    $ cd mysqlgo
+    $ make install
+    $ make example
+    $ ./example -host=127.0.0.1 -user=root -dbname=test
 
 TODO
 ====
@@ -56,6 +52,5 @@ TODO
  * Implement `TransactionalConnection` methods
  * Implement `InformativeCursor` methods
  * Implement `PythonicCursor` methods
- * Implement `FetchMany` and `FetchAll`
  * More exhaustive testing.  Most of the main methods are tested, but the test
    code needs some refactoring for clarity.

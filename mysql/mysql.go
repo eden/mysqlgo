@@ -386,6 +386,33 @@ cleanup:
 	return;
 }
 
+func returnResults(dc db.Cursor, ch chan db.Result) {
+	r, e := dc.FetchOne();
+	for ; r != nil && e == nil; r, e = dc.FetchOne() {
+		ch <- Result{r, nil}
+	}
+	if e != nil {
+		ch <- Result{nil, e}
+	}
+	close(ch);
+	dc.Close()
+}
+
+func (conn Connection) Iterate(stmt db.Statement, parameters ...)
+	(ch <-chan db.Result, err os.Error)
+{
+	var dc db.Cursor;
+	dc, err = conn.Execute(stmt, parameters);
+	if err != nil {
+		ch = nil;
+		return
+	}
+	sendch := make(chan db.Result);
+	go returnResults(dc, sendch);
+	ch = sendch;
+	return
+}
+
 func (conn Connection) ExecuteDirectly(query string, parameters ...)
 	(dbcur *db.Cursor, err os.Error)
 {
@@ -491,3 +518,11 @@ func (c Cursor) Close() (err os.Error) {
 	c.bound = false;
 	return;
 }
+
+type Result struct {
+	data	[]interface{};
+	error	os.Error;
+}
+
+func (r Result) Data() []interface{} { return r.data }
+func (r Result) Error() os.Error { return r.error }

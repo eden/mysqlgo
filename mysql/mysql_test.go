@@ -258,24 +258,19 @@ func TestPrepareExecuteReentrant(t *testing.T) {
 	}
 }
 
-func TestExecuteDirectly(t *testing.T) {
-	var (
-		conn db.FancyConnection;
-		ok bool;
-	)
+func TestChannelInterface(t *testing.T) {
+	conn := *startTestWithLoadedFixture(t);
+	stmt, sErr := conn.Prepare(
+		"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
+	if sErr != nil { error(t, sErr, "Couldn't Prepare") }
 
-	c := *startTestWithLoadedFixture(t);
-	if conn, ok = c.(db.FancyConnection); !ok {
-		t.Error("mysql.Connection does not assert as db.FancyConnection");
-	}
+	ch, err := conn.Iterate(stmt, 123);
+	if err != nil { error(t, err, "Couldn't Iterate") }
 
-	cur, err := conn.ExecuteDirectly(
-		"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC",
-		123);
-	if err != nil { error(t, err, "Couldn't ExecuteDirectly") }
-
-	for row, _ := cur.FetchOne(); row != nil; row, _ = cur.FetchOne() {
+	i := 0;
+	for r := range ch {
 		var pos int;
+		row := r.Data();
 
 		if i := row[0].(int); i != 123 {
 			t.Error("Invalid parameter bind in result");
@@ -289,7 +284,7 @@ func TestExecuteDirectly(t *testing.T) {
 					str, "!=", tableT[pos]);
 			}
 		}
+		i += 1
 	}
-	cur.Close();
 	conn.Close();
 }

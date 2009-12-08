@@ -37,6 +37,11 @@ func init() {
 	flag.BoolVar(&help, "help", false, "Print this help message and quit");
 }
 
+func errorAndQuit(err os.Error) {
+	fmt.Printf("Error: %s\n", err.String());
+	os.Exit(1)
+}
+
 func main() {
 	flag.Parse();
 	if help { flag.Usage(); os.Exit(1) }
@@ -48,7 +53,6 @@ func main() {
 		"pass": pass,
 		"database": dbname
 	});
-	fconn := conn.(db.FancyConnection);
 
 	if err != nil {
 		fmt.Printf("Error connecting to %s:%d: %s\n",
@@ -58,33 +62,47 @@ func main() {
 	}
 	var stmt db.Statement;
 
-	fmt.Println("Creating temporary table __hello");
-	_, e := fconn.ExecuteDirectly("CREATE TEMPORARY TABLE __hello (i INT)");
-	if e != nil { fmt.Printf("Error: %s", err); os.Exit(1); }
+	// Create table
+	fmt.Printf("Creating temporary table %s.__hello\n", dbname);
 
+	stmt, e := conn.Prepare(
+		"CREATE TEMPORARY TABLE __hello (i INT, s VARCHAR(255))");
+	if e != nil { errorAndQuit(e) }
+
+	_, e = conn.Execute(stmt);
+	if e != nil { errorAndQuit(e) }
+
+	// Populate table
 	fmt.Println("Inserting 100 random numbers");
-	stmt, e = conn.Prepare("INSERT INTO __hello (i) VALUE (?)");
-	if e != nil { fmt.Printf("Error: %s\n", err); os.Exit(1); }
+
+	stmt, e = conn.Prepare("INSERT INTO __hello (i, s) VALUE (?, ?)");
+	if e != nil { errorAndQuit(e) }
 
 	for i := 0; i < 100; i+=1 {
-		_, err = conn.Execute(stmt, rand.Int());
-		if err != nil { fmt.Printf("Error: %s\n", err); os.Exit(1); }
+		_, e = conn.Execute(stmt, rand.Int(), fmt.Sprintf("id%d", rand.Int()));
+		if e != nil { errorAndQuit(e) }
 	}
 	stmt.Close();
 
-	fmt.Println("Reading numbers in lexical order");
-	stmt, e = conn.Prepare("SELECT i FROM __hello ORDER BY i ASC");
-	if e != nil { fmt.Printf("Error: %s\n", err); os.Exit(1); }
+	// Read from table
+	fmt.Println("Reading numbers in numeric order");
 
-	cur, _ := conn.Execute(stmt);
-	for t, _ := cur.FetchOne(); t != nil; t, _ = cur.FetchOne() {
-		if v, ok := t[0].(int); ok {
-			fmt.Printf("%d\n", v)
+	stmt, e = conn.Prepare(
+		"SELECT i, s FROM __hello WHERE s LIKE ? ORDER BY i ASC");
+	if e != nil { errorAndQuit(e) }
+
+	ch, iterErr := conn.Iterate(stmt, "id%");
+	if iterErr != nil { errorAndQuit(iterErr) }
+
+	for res := range ch {
+		row := res.Data();
+
+		if v, ok := row[0].(int); ok {
+			fmt.Printf("%d %v\n", v, row[1])
 		} else {
 			fmt.Printf("Error converting %T to int\n", v)
 		}
 	}
-	cur.Close();
 	stmt.Close();
 
 	conn.Close();
