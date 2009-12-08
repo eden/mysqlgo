@@ -158,7 +158,7 @@ func open(args map[string]interface{}) (conn db.Connection, err os.Error) {
 
 	// If an error was set, or if the handle returned is not the same as the
 	// one we allocated, there was a problem.
-	err = c.LastError();
+	err = c.lastError();
 	if err != nil || rc != c.handle {
 		C.mysql_close(c.handle)
 	} else {
@@ -199,7 +199,7 @@ func init() {
 }
 
 // Returns the last error that occurred as an os.Error
-func (conn Connection) LastError() os.Error {
+func (conn Connection) lastError() os.Error {
 	if err := C.mysql_error(conn.handle); *err != 0 {
 		return os.NewError(C.GoString(err))
 	}
@@ -225,7 +225,7 @@ func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 		s.stmt, (*C.char)(unsafe.Pointer(&cquery[0])), C.ulong(len(query)));
 		r != 0
 	{
-		e = conn.LastError()
+		e = conn.lastError()
 	} else {
 		dbs = s
 	}
@@ -349,7 +349,7 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 		if pcount > 0 {
 			if binds, data, e = createParamBinds(parameters); e == nil {
 				if rc := C.mysql_stmt_bind_param(s.stmt, binds); rc != 0 {
-					err = conn.LastError();
+					err = conn.lastError();
 					goto cleanup;
 				}
 			} else {
@@ -363,12 +363,12 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 
 		conn.Lock();
 		if rc := C.mysql_stmt_execute(s.stmt); rc != 0 {
-			err = conn.LastError()
+			err = conn.lastError()
 		}
 		else {
 			// Must call store result before unlocking...
 			if rc := C.mysql_stmt_store_result(s.stmt); rc != 0 {
-				err = conn.LastError()
+				err = conn.lastError()
 			} else {
 				dbcur = NewCursorValue(s)
 			}
@@ -444,7 +444,7 @@ type Statement struct {
 func (s Statement) Close() (err os.Error) {
 	if s.stmt != nil {
 		if r := C.mysql_stmt_close(s.stmt); r != 0 {
-			err = s.conn.LastError()
+			err = s.conn.lastError()
 		}
 		s.stmt = nil;
 	}
@@ -475,7 +475,7 @@ func (c *Cursor) setupResultBinds() (err os.Error) {
 	c.rbinds, c.rdata = createResultBinds(c.stmt.stmt);
 	if c.rbinds != nil {
 		if rc := C.mysql_stmt_bind_result(c.stmt.stmt, c.rbinds); rc != 0 {
-			err = c.stmt.conn.LastError()
+			err = c.stmt.conn.lastError()
 		}
 	}
 	c.bound = true;
@@ -492,7 +492,7 @@ func (c Cursor) FetchOne() (res []interface{}, err os.Error) {
 	} else if rc == 100 {
 		// no data
 	} else {
-		err = c.stmt.conn.LastError()
+		err = c.stmt.conn.lastError()
 	}
 	return;
 }
