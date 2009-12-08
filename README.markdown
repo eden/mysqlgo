@@ -46,6 +46,9 @@ Install/Run Example
 TODO
 ====
 
+Most basic operations (execute queries, get results) are implemented and
+somewhat tested.  The major things left are:
+
  * Better parameter type support (right now only int and strings can be bound
    as parameters in `Prepare` and `ExecuteDirectly`).
  * `DATE`, `TIME` and `DATETIME` support.
