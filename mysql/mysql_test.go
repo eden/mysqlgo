@@ -16,15 +16,9 @@ import (
 )
 
 func defaultConn(t *testing.T) *db.Connection {
-	conn, e := mysql.Open(map[string]interface{}{
-		"host": "localhost",
-		"port": 3306,
-		"username": "root",
-		"database": "test",
-	});
-	if e != nil {
-		t.Log("Couldn't connect to root:@127.0.0.1:3306:test\n%s",
-			e);
+	conn, e := mysql.Open("//root@localhost:3306/test");
+	if conn == nil || e != nil {
+		t.Error("Couldn't connect to root@127.0.0.1:3306:test", e);
 		return nil;
 	}
 	return &conn;
@@ -95,6 +89,7 @@ func error(t *testing.T, err os.Error, msg string) {
 
 func TestOne(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
+	if conn == nil { t.Error("conn was nil"); return }
 
 	stmt, sErr := conn.Prepare(
 		"SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
@@ -151,6 +146,7 @@ func prepareEmpty(t *testing.T, conn *db.Connection, ch chan int) {
 
 func TestReentrantPrepare(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
+	if conn == nil { t.Error("conn was nil"); return }
 
 	ch := make([]chan int, 100);
 
@@ -186,6 +182,8 @@ func execute(t *testing.T, conn *db.Connection, stmt *db.Statement, ch chan int)
 
 func TestReentrantExecute(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
+	if conn == nil { t.Error("conn was nil"); return }
+
 	stmt, sErr := conn.Prepare(
 		"SELECT * FROM t ORDER BY RAND()");
 	if sErr != nil {
@@ -240,6 +238,7 @@ func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 func TestPrepareExecuteReentrant(t *testing.T) {
 	for j := 0; j < 10; j++ {
 		conn := startTestWithLoadedFixture(t);
+		if conn == nil { t.Error("conn was nil"); return }
 
 		ch := make([]chan *vector.Vector, 100);
 
@@ -259,7 +258,10 @@ func TestPrepareExecuteReentrant(t *testing.T) {
 }
 
 func TestChannelInterface(t *testing.T) {
-	conn := *startTestWithLoadedFixture(t);
+	con := startTestWithLoadedFixture(t);
+	if con == nil { t.Error("conn was nil"); return }
+	conn := *con;
+
 	stmt, sErr := conn.Prepare(
 		"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
 	if sErr != nil { error(t, sErr, "Couldn't Prepare") }

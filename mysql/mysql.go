@@ -44,14 +44,17 @@ char _charAt(void *p, int i) { return *((char *) (p + i)); }
 */
 import "C"
 
-// phf's experimental DB interface
-import "db"
-import "os"
-import "fmt"
-import "sync"
-import "unsafe"
-import "reflect"
-import "strings"
+import (
+	"db"; // Peter Froelhlich's experimental DB interface
+	"os";
+	"fmt";
+	"sync";
+	"http";
+	"unsafe";
+	"reflect";
+	"strings";
+	"strconv";
+)
 
 func platformConvertTiny(ptr unsafe.Pointer) int8 {
 	return int8(C._fromTiny(ptr))
@@ -92,51 +95,69 @@ type Connection struct {
 	lock	*sync.Mutex;
 }
 
-// The following arguments can be used to setup the connection:
+// The URL passed into this function should be of the form:
 //
-//	- host: Host to connect to, passed directly into mysql_real_connect
-//	  which will resolve DNS names.
-//	- port: Port on which to connect (int)
-//  - socket: Path to unix socket
-//	- username: Username to use for the connection.
-//	- password: Password to use for the connection.
-//	- database: Initial database to use after successfully connecting.
+//   mysql://user:pass@host:port/database_name
+//   mysql://user:pass@socket./database_name?socket=/tmp/mysql.sock
 //
-// If none are provided, the default will be taken from the user/system-wide
-// mysql configuration.
-func open(args map[string]interface{}) (conn db.Connection, err os.Error) {
+// Every option except for the database is optional, and missing items will be
+// taken from the system-wide configuration.
+//
+// The scheme may be omitted:
+//
+//   //user:pass@host:port/database_name
+//
+func open(uri string) (conn db.Connection, err os.Error) {
 	var host, uname, passwd, dbname, socket *C.char;
 	var port C.uint;
 
-	// Local helper function to unpack a CString from the passed in dictionary
-	// arguments
-	cstringFromMap := func(d map[string]interface{}, key string) (s *C.char) {
-		if v, f := d[key]; f {
-			if v, f := v.(string); f {
-				s = C.CString(v)
+	url, urlError := http.ParseURL(uri);
+	if urlError != nil {
+		err = MysqlError(fmt.Sprintf("Couldn't parse URL: %s", urlError));
+		return
+	}
+
+	if len(url.Scheme) > 0 && url.Scheme != "mysql" {
+		err = MysqlError(fmt.Sprintf("Invalid scheme: %s", url.Scheme));
+		return
+	}
+
+	if len(url.Host) > 0 {
+		if url.Host == "socket." {
+			sock := strings.Split(url.RawQuery, "=", 2);
+			if len(sock) != 2 || sock[0] != "socket" {
+				err = MysqlError(
+					fmt.Sprintf("Invalid socket specified: %s", url.RawQuery));
+				return
+			}
+			sock = strings.Split(sock[1], "&", 2);
+			socket = C.CString(sock[0])
+		} else {
+			hostport := strings.Split(url.Host, ":", 2);
+			if len(hostport) == 2 && len(hostport[1]) > 0 {
+				p, _ := strconv.Atoi(hostport[1]);
+				port = C.uint(p)
+			}
+			if len(hostport[0]) > 0 {
+				host = C.CString(hostport[0])
 			}
 		}
-		return;
-	};
+	}
 
-	host = cstringFromMap(args, "host");
-	socket = cstringFromMap(args, "socket");
+	if len(url.Userinfo) > 0 {
+		userpass := strings.Split(url.Userinfo, ":", 2);
+		if len(userpass) == 2 && len(userpass[1]) > 0 {
+			passwd = C.CString(userpass[1])
+		}
+		if len(userpass[0]) > 0 { uname = C.CString(userpass[0]) }
+	}
 
-	// Unpack a uint from the dictionary
-	if v, f := args["port"]; f {
-		if s, f := v.(int); f {
-			port = C.uint(s)
+	if len(url.Path) > 0 {
+		path := strings.Split(url.Path, "/", 2);
+		if len(path) == 2 && len(path[0]) == 0 && len(path[1]) > 0 {
+			dbname = C.CString(path[1])
 		}
 	}
-
-	if socket == nil && host == nil {
-		err = MysqlError("Either 'host' or 'socket' must be defined in args");
-		goto cleanup;
-	}
-
-	uname = cstringFromMap(args, "username");
-	passwd = cstringFromMap(args, "password");
-	dbname = cstringFromMap(args, "database");
 
 	c := Connection{};
 	c.lock = new(sync.Mutex);
