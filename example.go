@@ -46,13 +46,13 @@ func main() {
 	flag.Parse();
 	if help { flag.Usage(); os.Exit(1) }
 
-	conn, err := mysql.Open(map[string]interface{} {
-		"host": host,
-		"port": port,
-		"user": user,
-		"pass": pass,
-		"database": dbname
-	});
+	conn, err := mysql.Open(fmt.Sprintf("mysql://%s:%s@%s:%d/%s",
+		 user,
+		 pass,
+		 host,
+		 port,
+		 dbname
+	));
 
 	if err != nil {
 		fmt.Printf("Error connecting to %s:%d: %s\n",

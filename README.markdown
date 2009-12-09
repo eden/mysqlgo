@@ -15,11 +15,7 @@ The `Makefile` assumes `mysql_config` is in your path.
 Synopsis
 --------
 
-    conn, err := mysql.Open(map[string]interface{} {
-      "host": "127.0.0.1",
-      "port": 3306,
-      "username": "root"
-    });
+    conn, err := mysql.Open("mysql://root@127.0.0.1:3306/test");
     if err != nil { panic("Connect error:", err) }
 
     stmt, serr := conn.Prepare("SELECT * FROM table WHERE name LIKE ?");
