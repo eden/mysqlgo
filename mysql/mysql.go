@@ -45,7 +45,7 @@ char _charAt(void *p, int i) { return *((char *) (p + i)); }
 import "C"
 
 import (
-	"db"; // Peter Froelhlich's experimental DB interface
+	"db"; // Peter Froehlich's experimental DB interface
 	"os";
 	"fmt";
 	"sync";
