@@ -46,10 +46,8 @@ Most basic operations (execute queries, get results) are implemented and
 somewhat tested.  The major things left are:
 
  * Better parameter type support (right now only int and strings can be bound
-   as parameters in `Prepare` and `ExecuteDirectly`).
+   as parameters in `Iterate` and `Execute`).
  * `DATE`, `TIME` and `DATETIME` support.
  * Implement `TransactionalConnection` methods
- * Implement `InformativeCursor` methods
- * Implement `PythonicCursor` methods
  * More exhaustive testing.  Most of the main methods are tested, but the test
    code needs some refactoring for clarity.
