@@ -21,7 +21,7 @@ Synopsis
     stmt, serr := conn.Prepare("SELECT * FROM table WHERE name LIKE ?");
     if serr != nil { panic("Prepare error:", serr) }
 
-    ch, cerr := conn.Iterate(stmt, "George%");
+    ch, cerr := conn.Execute(stmt, "George%");
     if cerr != nil { panic("Iterate error:", cerr) }
 
     for result := range ch {

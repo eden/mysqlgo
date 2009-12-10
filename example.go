@@ -103,9 +103,9 @@ func main() {
 		errorAndQuit(e)
 	}
 
-	ch, iterErr := conn.Iterate(stmt, "id%");
-	if iterErr != nil {
-		errorAndQuit(iterErr)
+	ch, cErr := conn.Execute(stmt, "id%");
+	if cErr != nil {
+		errorAndQuit(cErr)
 	}
 
 	for res := range ch {
