@@ -5,10 +5,10 @@
 // Common mysql constants and conversion functions
 package mysql
 
-type MysqlType int;
+type MysqlType int
 
 const (
-	MysqlTypeDecimal = iota;
+	MysqlTypeDecimal	= iota;
 	MysqlTypeTiny;
 	MysqlTypeShort;
 	MysqlTypeLong;
@@ -25,14 +25,14 @@ const (
 	MysqlTypeNewdate;
 	MysqlTypeVarchar;
 	MysqlTypeBit;
-	MysqlTypeNewdecimal=246;
-	MysqlTypeEnum=247;
-	MysqlTypeSet=248;
-	MysqlTypeTinyBlob=249;
-	MysqlTypeMedium_Blob=250;
-	MysqlTypeLongBlob=251;
-	MysqlTypeBlob=252;
-	MysqlTypeVarString=253;
-	MysqlTypeString=254;
-	MysqlTypeGeometry=255;
+	MysqlTypeNewdecimal	= 246;
+	MysqlTypeEnum		= 247;
+	MysqlTypeSet		= 248;
+	MysqlTypeTinyBlob	= 249;
+	MysqlTypeMedium_Blob	= 250;
+	MysqlTypeLongBlob	= 251;
+	MysqlTypeBlob		= 252;
+	MysqlTypeVarString	= 253;
+	MysqlTypeString		= 254;
+	MysqlTypeGeometry	= 255;
 )

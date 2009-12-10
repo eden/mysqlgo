@@ -45,7 +45,7 @@ char _charAt(void *p, int i) { return *((char *) (p + i)); }
 import "C"
 
 import (
-	"db"; // Peter Froehlich's experimental DB interface
+	"db";	// Peter Froehlich's experimental DB interface
 	"os";
 	"fmt";
 	"sync";
@@ -114,12 +114,12 @@ func open(uri string) (conn db.Connection, err os.Error) {
 	url, urlError := http.ParseURL(uri);
 	if urlError != nil {
 		err = MysqlError(fmt.Sprintf("Couldn't parse URL: %s", urlError));
-		return
+		return;
 	}
 
 	if len(url.Scheme) > 0 && url.Scheme != "mysql" {
 		err = MysqlError(fmt.Sprintf("Invalid scheme: %s", url.Scheme));
-		return
+		return;
 	}
 
 	if len(url.Host) > 0 {
@@ -128,15 +128,15 @@ func open(uri string) (conn db.Connection, err os.Error) {
 			if len(sock) != 2 || sock[0] != "socket" {
 				err = MysqlError(
 					fmt.Sprintf("Invalid socket specified: %s", url.RawQuery));
-				return
+				return;
 			}
 			sock = strings.Split(sock[1], "&", 2);
-			socket = C.CString(sock[0])
+			socket = C.CString(sock[0]);
 		} else {
 			hostport := strings.Split(url.Host, ":", 2);
 			if len(hostport) == 2 && len(hostport[1]) > 0 {
 				p, _ := strconv.Atoi(hostport[1]);
-				port = C.uint(p)
+				port = C.uint(p);
 			}
 			if len(hostport[0]) > 0 {
 				host = C.CString(hostport[0])
@@ -149,7 +149,9 @@ func open(uri string) (conn db.Connection, err os.Error) {
 		if len(userpass) == 2 && len(userpass[1]) > 0 {
 			passwd = C.CString(userpass[1])
 		}
-		if len(userpass[0]) > 0 { uname = C.CString(userpass[0]) }
+		if len(userpass[0]) > 0 {
+			uname = C.CString(userpass[0])
+		}
 	}
 
 	if len(url.Path) > 0 {
@@ -243,9 +245,7 @@ func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 	conn.Lock();
 	cquery := strings.Bytes(query);
 	if r := C.mysql_stmt_prepare(
-		s.stmt, (*C.char)(unsafe.Pointer(&cquery[0])), C.ulong(len(query)));
-		r != 0
-	{
+		s.stmt, (*C.char)(unsafe.Pointer(&cquery[0])), C.ulong(len(query))); r != 0 {
 		e = conn.lastError()
 	} else {
 		dbs = s
@@ -255,8 +255,8 @@ func (conn Connection) Prepare(query string) (dbs db.Statement, e os.Error) {
 	return;
 }
 
-func (conn Connection) Lock() { conn.lock.Lock() }
-func (conn Connection) Unlock() { conn.lock.Unlock() }
+func (conn Connection) Lock()	{ conn.lock.Lock() }
+func (conn Connection) Unlock()	{ conn.lock.Unlock() }
 
 func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.Error) {
 	a := reflect.NewValue(args).(*reflect.StructValue);
@@ -361,10 +361,10 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 	dbcur = nil;
 	if s, ok := stmt.(Statement); ok {
 		var (
-			binds	*C.MYSQL_BIND = nil;
+			binds	*C.MYSQL_BIND	= nil;
 			data	[]BoundData;
 			e	os.Error;
-		);
+		)
 		pcount := uint64(C.mysql_stmt_param_count(s.stmt));
 
 		if pcount > 0 {
@@ -385,8 +385,7 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 		conn.Lock();
 		if rc := C.mysql_stmt_execute(s.stmt); rc != 0 {
 			err = conn.lastError()
-		}
-		else {
+		} else {
 			// Must call store result before unlocking...
 			if rc := C.mysql_stmt_store_result(s.stmt); rc != 0 {
 				err = conn.lastError()
@@ -395,7 +394,7 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 			}
 		}
 
-cleanup:
+	cleanup:
 		if binds != nil {
 			C.free(unsafe.Pointer(binds))
 		}
@@ -416,34 +415,33 @@ func returnResults(dc db.Cursor, ch chan db.Result) {
 		ch <- Result{nil, e}
 	}
 	close(ch);
-	dc.Close()
+	dc.Close();
 }
 
-func (conn Connection) Iterate(stmt db.Statement, parameters ...)
-	(ch <-chan db.Result, err os.Error)
-{
+func (conn Connection) Iterate(stmt db.Statement, parameters ...) (ch <-chan db.Result, err os.Error) {
 	var dc db.Cursor;
 	dc, err = conn.Execute(stmt, parameters);
 	if err != nil {
 		ch = nil;
-		return
+		return;
 	}
 	sendch := make(chan db.Result);
 	go returnResults(dc, sendch);
 	ch = sendch;
-	return
+	return;
 }
 
-func (conn Connection) ExecuteDirectly(query string, parameters ...)
-	(dbcur *db.Cursor, err os.Error)
-{
-	var (stmt db.Statement; cur db.Cursor);
+func (conn Connection) ExecuteDirectly(query string, parameters ...) (dbcur *db.Cursor, err os.Error) {
+	var (
+		stmt	db.Statement;
+		cur	db.Cursor;
+	)
 	dbcur = nil;
 	stmt, err = conn.Prepare(query);
 	if err == nil {
 		cur, err = conn.Execute(stmt, parameters);
 		if err == nil {
-			dbcur = &cur;
+			dbcur = &cur
 		}
 	}
 	stmt.Close();
@@ -520,12 +518,12 @@ func (c Cursor) FetchOne() (res []interface{}, err os.Error) {
 
 func (c Cursor) FetchMany(count int) (res [][]interface{}, err os.Error) {
 	err = MysqlError("Not yet implemented");
-	return
+	return;
 }
 
 func (c Cursor) FetchAll() (res [][]interface{}, err os.Error) {
 	err = MysqlError("Not yet implemented");
-	return
+	return;
 }
 
 func (c Cursor) Close() (err os.Error) {
@@ -545,5 +543,5 @@ type Result struct {
 	error	os.Error;
 }
 
-func (r Result) Data() []interface{} { return r.data }
-func (r Result) Error() os.Error { return r.error }
+func (r Result) Data() []interface{}	{ return r.data }
+func (r Result) Error() os.Error	{ return r.error }

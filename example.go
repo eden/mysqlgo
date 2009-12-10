@@ -39,26 +39,28 @@ func init() {
 
 func errorAndQuit(err os.Error) {
 	fmt.Printf("Error: %s\n", err.String());
-	os.Exit(1)
+	os.Exit(1);
 }
 
 func main() {
 	flag.Parse();
-	if help { flag.Usage(); os.Exit(1) }
+	if help {
+		flag.Usage();
+		os.Exit(1);
+	}
 
 	conn, err := mysql.Open(fmt.Sprintf("mysql://%s:%s@%s:%d/%s",
-		 user,
-		 pass,
-		 host,
-		 port,
-		 dbname
-	));
+		user,
+		pass,
+		host,
+		port,
+		dbname));
 
 	if err != nil {
 		fmt.Printf("Error connecting to %s:%d: %s\n",
 			host, port, err);
 		flag.Usage();
-		os.Exit(1)
+		os.Exit(1);
 	}
 	var stmt db.Statement;
 
@@ -67,20 +69,28 @@ func main() {
 
 	stmt, e := conn.Prepare(
 		"CREATE TEMPORARY TABLE __hello (i INT, s VARCHAR(255))");
-	if e != nil { errorAndQuit(e) }
+	if e != nil {
+		errorAndQuit(e)
+	}
 
 	_, e = conn.Execute(stmt);
-	if e != nil { errorAndQuit(e) }
+	if e != nil {
+		errorAndQuit(e)
+	}
 
 	// Populate table
 	fmt.Println("Inserting 100 random numbers");
 
 	stmt, e = conn.Prepare("INSERT INTO __hello (i, s) VALUE (?, ?)");
-	if e != nil { errorAndQuit(e) }
+	if e != nil {
+		errorAndQuit(e)
+	}
 
-	for i := 0; i < 100; i+=1 {
+	for i := 0; i < 100; i += 1 {
 		_, e = conn.Execute(stmt, rand.Int(), fmt.Sprintf("id%d", rand.Int()));
-		if e != nil { errorAndQuit(e) }
+		if e != nil {
+			errorAndQuit(e)
+		}
 	}
 	stmt.Close();
 
@@ -89,10 +99,14 @@ func main() {
 
 	stmt, e = conn.Prepare(
 		"SELECT i, s FROM __hello WHERE s LIKE ? ORDER BY i ASC");
-	if e != nil { errorAndQuit(e) }
+	if e != nil {
+		errorAndQuit(e)
+	}
 
 	ch, iterErr := conn.Iterate(stmt, "id%");
-	if iterErr != nil { errorAndQuit(iterErr) }
+	if iterErr != nil {
+		errorAndQuit(iterErr)
+	}
 
 	for res := range ch {
 		row := res.Data();
