@@ -290,3 +290,41 @@ func TestChannelInterface(t *testing.T) {
 	}
 	conn.Close();
 }
+
+func TestChannelInterfacePrematureClose(t *testing.T) {
+	con := startTestWithLoadedFixture(t);
+	if con == nil { t.Error("conn was nil"); return }
+	conn := *con;
+
+	execOne := func() {
+		stmt, sErr := conn.Prepare(
+			"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
+		if sErr != nil { error(t, sErr, "Couldn't Prepare") }
+
+		ch, err := conn.Iterate(stmt, 123);
+		if err != nil { error(t, err, "Couldn't Iterate") }
+
+		r := <-ch;
+		row := r.Data();
+
+		if i := row[0].(int); i != 123 {
+			t.Error("Invalid parameter bind in result");
+		}
+		if pos := row[1].(int); pos >= 0 && pos < len(tableT) {
+			if str := row[2].(string); tableT[pos] != str {
+				t.Error("Invalid result bind phrase (2)",
+					str, "!=", tableT[pos]);
+			}
+		}
+		else {
+			t.Error("Invalid result bind pos (1)");
+		}
+		close(ch);
+	};
+
+	// Try *lots* of times, if the driver does not properly close the
+	// underlying result, subsequent execs should fail with segfaults
+	for i := 0; i < 1000; i += 1 { execOne() }
+
+	conn.Close();
+}

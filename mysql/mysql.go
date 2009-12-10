@@ -409,7 +409,7 @@ cleanup:
 
 func returnResults(dc db.Cursor, ch chan db.Result) {
 	r, e := dc.FetchOne();
-	for ; r != nil && e == nil; r, e = dc.FetchOne() {
+	for ; !closed(ch) && r != nil && e == nil; r, e = dc.FetchOne() {
 		ch <- Result{r, nil}
 	}
 	if e != nil {
