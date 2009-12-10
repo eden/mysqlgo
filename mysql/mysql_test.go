@@ -322,8 +322,6 @@ func TestChannelInterfacePrematureClose(t *testing.T) {
 		close(ch);
 	};
 
-	// Try *lots* of times, if the driver does not properly close the
-	// underlying result, subsequent execs should fail with segfaults
 	for i := 0; i < 1000; i += 1 { execOne() }
 
 	conn.Close();
