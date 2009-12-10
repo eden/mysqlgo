@@ -356,7 +356,9 @@ func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, *[]BoundData) {
 	return nil, nil;
 }
 
-func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Cursor, err os.Error) {
+func (conn Connection) execute(stmt db.Statement, parameters ...)
+	(dbcur *cursor, err os.Error)
+{
 
 	dbcur = nil;
 	if s, ok := stmt.(Statement); ok {
@@ -406,9 +408,9 @@ func (conn Connection) Execute(stmt db.Statement, parameters ...) (dbcur db.Curs
 	return;
 }
 
-func returnResults(dc db.Cursor, ch chan db.Result) {
-	r, e := dc.FetchOne();
-	for ; !closed(ch) && r != nil && e == nil; r, e = dc.FetchOne() {
+func returnResults(dc *cursor, ch chan db.Result) {
+	r, e := dc.Fetch();
+	for ; !closed(ch) && r != nil && e == nil; r, e = dc.Fetch() {
 		ch <- Result{r, nil}
 	}
 	if e != nil {
@@ -418,9 +420,11 @@ func returnResults(dc db.Cursor, ch chan db.Result) {
 	dc.Close();
 }
 
-func (conn Connection) Iterate(stmt db.Statement, parameters ...) (ch <-chan db.Result, err os.Error) {
-	var dc db.Cursor;
-	dc, err = conn.Execute(stmt, parameters);
+func (conn Connection) Execute(stmt db.Statement, parameters ...)
+	(ch <-chan db.Result, err os.Error)
+{
+	var dc *cursor;
+	dc, err = conn.execute(stmt, parameters);
 	if err != nil {
 		ch = nil;
 		return;
@@ -428,23 +432,6 @@ func (conn Connection) Iterate(stmt db.Statement, parameters ...) (ch <-chan db.
 	sendch := make(chan db.Result);
 	go returnResults(dc, sendch);
 	ch = sendch;
-	return;
-}
-
-func (conn Connection) ExecuteDirectly(query string, parameters ...) (dbcur *db.Cursor, err os.Error) {
-	var (
-		stmt	db.Statement;
-		cur	db.Cursor;
-	)
-	dbcur = nil;
-	stmt, err = conn.Prepare(query);
-	if err == nil {
-		cur, err = conn.Execute(stmt, parameters);
-		if err == nil {
-			dbcur = &cur
-		}
-	}
-	stmt.Close();
 	return;
 }
 
@@ -462,32 +449,32 @@ type Statement struct {
 
 func (s Statement) Close() (err os.Error) {
 	if s.stmt != nil {
+		s.conn.Lock();
 		if r := C.mysql_stmt_close(s.stmt); r != 0 {
 			err = s.conn.lastError()
 		}
 		s.stmt = nil;
+		s.conn.Unlock();
 	}
 	return nil;
 }
 
-type Cursor struct {
+type cursor struct {
 	stmt	*Statement;
 	rbinds	*C.MYSQL_BIND;
 	rdata	*[]BoundData;
 	bound	bool;
 }
 
-func NewCursorValue(s Statement) Cursor {
-	cur := Cursor{};
+func NewCursorValue(s Statement) *cursor {
+	cur := &cursor{};
 	cur.stmt = &s;
 	cur.bound = false;
-	(&cur).setupResultBinds();
+	cur.setupResultBinds();
 	return cur;
 }
 
-func (c Cursor) MoreResults() bool	{ return false }
-
-func (c *Cursor) setupResultBinds() (err os.Error) {
+func (c *cursor) setupResultBinds() (err os.Error) {
 	if c.bound {
 		return
 	}
@@ -501,7 +488,7 @@ func (c *Cursor) setupResultBinds() (err os.Error) {
 	return;
 }
 
-func (c Cursor) FetchOne() (res []interface{}, err os.Error) {
+func (c *cursor) Fetch() (res []interface{}, err os.Error) {
 	if rc := C.mysql_stmt_fetch(c.stmt.stmt); rc == 0 {
 		res = make([]interface{}, len(*c.rdata));
 		rdata := *c.rdata;
@@ -516,17 +503,7 @@ func (c Cursor) FetchOne() (res []interface{}, err os.Error) {
 	return;
 }
 
-func (c Cursor) FetchMany(count int) (res [][]interface{}, err os.Error) {
-	err = MysqlError("Not yet implemented");
-	return;
-}
-
-func (c Cursor) FetchAll() (res [][]interface{}, err os.Error) {
-	err = MysqlError("Not yet implemented");
-	return;
-}
-
-func (c Cursor) Close() (err os.Error) {
+func (c *cursor) Close() (err os.Error) {
 	if c.rbinds != nil {
 		c.stmt.conn.Lock();
 		C.mysql_bind_free(c.rbinds);

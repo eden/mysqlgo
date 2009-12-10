@@ -45,12 +45,12 @@ func prepareTestTable(t *testing.T, conn *db.Connection) {
 		return;
 	}
 
-	cur, cErr := conn.Execute(stmt);
+	ch, cErr := conn.Execute(stmt);
 	if cErr != nil {
 		error(t, cErr, "Couldn't create temporary table test.t");
 		return;
 	}
-	cur.Close();
+	close(ch);
 
 	stmt, sErr = conn.Prepare("INSERT INTO t (i, s) VALUES (?, ?)");
 	if sErr != nil {
@@ -59,12 +59,12 @@ func prepareTestTable(t *testing.T, conn *db.Connection) {
 	}
 
 	for i, s := range tableT {
-		cur, cErr = conn.Execute(stmt, i, s);
-		if cur == nil || cErr != nil {
+		ch, cErr = conn.Execute(stmt, i, s);
+		if cErr != nil {
 			error(t, cErr, "Couldn't insert into temporary table test.t");
 			return;
 		}
-		cur.Close();
+		close(ch);
 	}
 	stmt.Close();
 }
@@ -97,20 +97,18 @@ func TestOne(t *testing.T) {
 		error(t, sErr,
 			"Couldn't prepare for select from temporary table test.t")
 	}
-	cur, cErr := conn.Execute(stmt);
+	ch, cErr := conn.Execute(stmt);
 	if cErr != nil {
 		error(t, cErr, "Couldn't execute statement")
 	}
 
 	i := 0;
-	row, err := cur.FetchOne();
-	if row == nil {
-		t.Error("row is nil")
-	}
-	for row != nil {
-		if err != nil {
-			error(t, err, "Couldn't FetchOne()")
+	for res := range(ch) {
+		if res.Error() != nil {
+			error(t, res.Error(), "Couldn't fetch from channel")
 		}
+
+		row := res.Data();
 		if v, ok := row[0].(int); !ok || i != v {
 			if ok {
 				t.Errorf("Mismatch %d != %d", i, v)
@@ -126,10 +124,8 @@ func TestOne(t *testing.T) {
 			}
 		}
 		i += 1;
-		row, err = cur.FetchOne();
 	}
 
-	cur.Close();
 	stmt.Close();
 	conn.Close();
 }
@@ -162,21 +158,15 @@ func TestReentrantPrepare(t *testing.T) {
 }
 
 func execute(t *testing.T, conn *db.Connection, stmt *db.Statement, ch chan int) {
-	cur, cErr := conn.Execute(*stmt, rand.Int());
+	c, cErr := conn.Execute(*stmt, rand.Int());
 	if cErr != nil {
 		error(t, cErr, "Couldn't select")
 	}
-	res, fErr := cur.FetchOne();
-	if fErr != nil {
-		error(t, fErr, "Couldn't fetch")
-	}
-	for res != nil {
-		res, fErr = cur.FetchOne();
-		if fErr != nil {
-			error(t, fErr, "Couldn't fetch")
+	for res := range(c) {
+		if res.Error() != nil {
+			error(t, res.Error(), "Couldn't fetch")
 		}
 	}
-	cur.Close();
 	ch <- 1;
 }
 
@@ -190,7 +180,7 @@ func TestReentrantExecute(t *testing.T) {
 		error(t, sErr, "Couldn't prepare")
 	}
 
-	ch := make([]chan int, 1);
+	ch := make([]chan int, 10);
 
 	for i, _ := range ch {
 		ch[i] = make(chan int);
@@ -211,26 +201,23 @@ func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 		error(t, sErr, "Couldn't prepare")
 	}
 
-	cur, cErr := conn.Execute(stmt, rand.Int());
+	c, cErr := conn.Execute(stmt, rand.Int());
 	if cErr != nil {
 		error(t, cErr, "Couldn't select")
 	}
 
 	vout := new(vector.Vector);
-	res, fErr := cur.FetchOne();
-	if fErr != nil {
-		error(t, fErr, "Couldn't fetch")
-	}
-	for res != nil {
-		vout.Push(res);
-		res, fErr = cur.FetchOne();
+	for res := range(c) {
+		if res.Error() != nil {
+			error(t, res.Error(), "Couldn't fetch")
+		}
+		vout.Push(res.Data());
 	}
 
 	if vout.Len() != len(tableT) {
 		t.Error("Invalid length")
 	}
 
-	cur.Close();
 	stmt.Close();
 	ch <- vout;
 }
@@ -266,8 +253,8 @@ func TestChannelInterface(t *testing.T) {
 		"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
 	if sErr != nil { error(t, sErr, "Couldn't Prepare") }
 
-	ch, err := conn.Iterate(stmt, 123);
-	if err != nil { error(t, err, "Couldn't Iterate") }
+	ch, err := conn.Execute(stmt, 123);
+	if err != nil { error(t, err, "Couldn't Execute") }
 
 	i := 0;
 	for r := range ch {
@@ -301,8 +288,8 @@ func TestChannelInterfacePrematureClose(t *testing.T) {
 			"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
 		if sErr != nil { error(t, sErr, "Couldn't Prepare") }
 
-		ch, err := conn.Iterate(stmt, 123);
-		if err != nil { error(t, err, "Couldn't Iterate") }
+		ch, err := conn.Execute(stmt, 123);
+		if err != nil { error(t, err, "Couldn't Execute") }
 
 		r := <-ch;
 		row := r.Data();
