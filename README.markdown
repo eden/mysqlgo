@@ -1,9 +1,8 @@
 MySQL Bindings for Go (golang)
 ==============================
 
-Implements MySQL support for Go via libmysql.  The interface follows Peter
-Froehlich's [database
-interface](http://github.com/phf/go-sqlite/blob/master/db.go).  This is
+Implements MySQL support for Go via libmysql.  The interface implements Peter
+Froehlich's [database interface](http://github.com/phf/go-db).  This is
 automatically included via a git submodule.
 
 Currently, it is possible to share a single connection with multiple
