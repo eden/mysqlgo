@@ -89,7 +89,10 @@ func error(t *testing.T, err os.Error, msg string) {
 
 func TestOne(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
-	if conn == nil { t.Error("conn was nil"); return }
+	if conn == nil {
+		t.Error("conn was nil");
+		return;
+	}
 
 	stmt, sErr := conn.Prepare(
 		"SELECT i AS pos, s AS phrase FROM t ORDER BY pos ASC");
@@ -103,7 +106,7 @@ func TestOne(t *testing.T) {
 	}
 
 	i := 0;
-	for res := range(ch) {
+	for res := range (ch) {
 		if res.Error() != nil {
 			error(t, res.Error(), "Couldn't fetch from channel")
 		}
@@ -142,7 +145,10 @@ func prepareEmpty(t *testing.T, conn *db.Connection, ch chan int) {
 
 func TestReentrantPrepare(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
-	if conn == nil { t.Error("conn was nil"); return }
+	if conn == nil {
+		t.Error("conn was nil");
+		return;
+	}
 
 	ch := make([]chan int, 100);
 
@@ -151,7 +157,7 @@ func TestReentrantPrepare(t *testing.T) {
 		go prepareEmpty(t, conn, ch[i]);
 	}
 	for _, c := range ch {
-		<-c;
+		<-c
 	}
 
 	conn.Close();
@@ -162,7 +168,7 @@ func execute(t *testing.T, conn *db.Connection, stmt *db.Statement, ch chan int)
 	if cErr != nil {
 		error(t, cErr, "Couldn't select")
 	}
-	for res := range(c) {
+	for res := range (c) {
 		if res.Error() != nil {
 			error(t, res.Error(), "Couldn't fetch")
 		}
@@ -172,7 +178,10 @@ func execute(t *testing.T, conn *db.Connection, stmt *db.Statement, ch chan int)
 
 func TestReentrantExecute(t *testing.T) {
 	conn := startTestWithLoadedFixture(t);
-	if conn == nil { t.Error("conn was nil"); return }
+	if conn == nil {
+		t.Error("conn was nil");
+		return;
+	}
 
 	stmt, sErr := conn.Prepare(
 		"SELECT * FROM t ORDER BY RAND()");
@@ -207,7 +216,7 @@ func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 	}
 
 	vout := new(vector.Vector);
-	for res := range(c) {
+	for res := range (c) {
 		if res.Error() != nil {
 			error(t, res.Error(), "Couldn't fetch")
 		}
@@ -225,7 +234,10 @@ func findRand(t *testing.T, conn *db.Connection, ch chan *vector.Vector) {
 func TestPrepareExecuteReentrant(t *testing.T) {
 	for j := 0; j < 10; j++ {
 		conn := startTestWithLoadedFixture(t);
-		if conn == nil { t.Error("conn was nil"); return }
+		if conn == nil {
+			t.Error("conn was nil");
+			return;
+		}
 
 		ch := make([]chan *vector.Vector, 100);
 
@@ -246,15 +258,22 @@ func TestPrepareExecuteReentrant(t *testing.T) {
 
 func TestChannelInterface(t *testing.T) {
 	con := startTestWithLoadedFixture(t);
-	if con == nil { t.Error("conn was nil"); return }
+	if con == nil {
+		t.Error("conn was nil");
+		return;
+	}
 	conn := *con;
 
 	stmt, sErr := conn.Prepare(
 		"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
-	if sErr != nil { error(t, sErr, "Couldn't Prepare") }
+	if sErr != nil {
+		error(t, sErr, "Couldn't Prepare")
+	}
 
 	ch, err := conn.Execute(stmt, 123);
-	if err != nil { error(t, err, "Couldn't Execute") }
+	if err != nil {
+		error(t, err, "Couldn't Execute")
+	}
 
 	i := 0;
 	for r := range ch {
@@ -262,54 +281,61 @@ func TestChannelInterface(t *testing.T) {
 		row := r.Data();
 
 		if i := row[0].(int); i != 123 {
-			t.Error("Invalid parameter bind in result");
+			t.Error("Invalid parameter bind in result")
 		}
 		if pos = row[1].(int); pos < 0 || pos >= len(tableT) {
-			t.Error("Invalid result bind pos (1)");
-		}
-		else {
+			t.Error("Invalid result bind pos (1)")
+		} else {
 			if str := row[2].(string); tableT[pos] != str {
 				t.Error("Invalid result bind phrase (2)",
-					str, "!=", tableT[pos]);
+					str, "!=", tableT[pos])
 			}
 		}
-		i += 1
+		i += 1;
 	}
 	conn.Close();
 }
 
 func TestChannelInterfacePrematureClose(t *testing.T) {
 	con := startTestWithLoadedFixture(t);
-	if con == nil { t.Error("conn was nil"); return }
+	if con == nil {
+		t.Error("conn was nil");
+		return;
+	}
 	conn := *con;
 
 	execOne := func() {
 		stmt, sErr := conn.Prepare(
 			"SELECT ?, i AS pos, s AS phrase FROM t ORDER BY pos ASC");
-		if sErr != nil { error(t, sErr, "Couldn't Prepare") }
+		if sErr != nil {
+			error(t, sErr, "Couldn't Prepare")
+		}
 
 		ch, err := conn.Execute(stmt, 123);
-		if err != nil { error(t, err, "Couldn't Execute") }
+		if err != nil {
+			error(t, err, "Couldn't Execute")
+		}
 
 		r := <-ch;
 		row := r.Data();
 
 		if i := row[0].(int); i != 123 {
-			t.Error("Invalid parameter bind in result");
+			t.Error("Invalid parameter bind in result")
 		}
 		if pos := row[1].(int); pos >= 0 && pos < len(tableT) {
 			if str := row[2].(string); tableT[pos] != str {
 				t.Error("Invalid result bind phrase (2)",
-					str, "!=", tableT[pos]);
+					str, "!=", tableT[pos])
 			}
-		}
-		else {
-			t.Error("Invalid result bind pos (1)");
+		} else {
+			t.Error("Invalid result bind pos (1)")
 		}
 		close(ch);
 	};
 
-	for i := 0; i < 1000; i += 1 { execOne() }
+	for i := 0; i < 1000; i += 1 {
+		execOne()
+	}
 
 	conn.Close();
 }

@@ -45,7 +45,7 @@ char _charAt(void *p, int i) { return *((char *) (p + i)); }
 import "C"
 
 import (
-	"db";	// Peter Froehlich's experimental DB interface
+	"db";
 	"os";
 	"fmt";
 	"sync";
@@ -272,7 +272,7 @@ func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.E
 				break;
 
 			case *reflect.IntValue:
-				// TODO use the native platform to do this conversion
+				/* TODO use the native platform to do this conversion */
 				data[i] = *NewBoundData(
 					MysqlTypeLong,
 					nil,
@@ -287,7 +287,6 @@ func createParamBinds(args ...) (binds *C.MYSQL_BIND, data []BoundData, err os.E
 				for j := uint(0); j < 4; j += 1 {
 					data[i].buffer[j] = uint8((v >> (j * 8)) & 0xff)
 				}
-				// XXX --
 
 				C.mysql_bind_assign(
 					binds,
@@ -356,9 +355,7 @@ func createResultBinds(stmt *C.MYSQL_STMT) (*C.MYSQL_BIND, *[]BoundData) {
 	return nil, nil;
 }
 
-func (conn Connection) execute(stmt db.Statement, parameters ...)
-	(dbcur *cursor, err os.Error)
-{
+func (conn Connection) execute(stmt db.Statement, parameters ...) (dbcur *cursor, err os.Error) {
 
 	dbcur = nil;
 	if s, ok := stmt.(Statement); ok {
@@ -420,9 +417,7 @@ func returnResults(dc *cursor, ch chan db.Result) {
 	dc.Close();
 }
 
-func (conn Connection) Execute(stmt db.Statement, parameters ...)
-	(ch <-chan db.Result, err os.Error)
-{
+func (conn Connection) Execute(stmt db.Statement, parameters ...) (ch <-chan db.Result, err os.Error) {
 	var dc *cursor;
 	dc, err = conn.execute(stmt, parameters);
 	if err != nil {
