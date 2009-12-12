@@ -103,12 +103,12 @@ func main() {
 		errorAndQuit(e)
 	}
 
-	ch, cErr := conn.Execute(stmt, "id%");
+	rs, cErr := conn.Execute(stmt, "id%");
 	if cErr != nil {
 		errorAndQuit(cErr)
 	}
 
-	for res := range ch {
+	for res := range rs.Iter() {
 		row := res.Data();
 
 		if v, ok := row[0].(int); ok {
@@ -118,6 +118,5 @@ func main() {
 		}
 	}
 	stmt.Close();
-
 	conn.Close();
 }

@@ -20,10 +20,10 @@ Synopsis
     stmt, serr := conn.Prepare("SELECT * FROM table WHERE name LIKE ?");
     if serr != nil { panic("Prepare error:", serr) }
 
-    ch, cerr := conn.Execute(stmt, "George%");
-    if cerr != nil { panic("Iterate error:", cerr) }
+    rs, rerr := conn.Execute(stmt, "George%");
+    if rerr != nil { panic("Execute error:", rerr) }
 
-    for result := range ch {
+    for result := range rs.Iter() {
       data := result.Data();
       fmt.Println(data)
     }
@@ -33,6 +33,7 @@ Synopsis
 Install/Run Example
 -------------------
 
+    $ git clone git://github.com/eden/mysqlgo.git
     $ cd mysqlgo
     $ make install
     $ make example
@@ -50,3 +51,4 @@ somewhat tested.  The major things left are:
  * Implement `TransactionalConnection` methods
  * More exhaustive testing.  Most of the main methods are tested, but the test
    code needs some refactoring for clarity.
+ * Cleanup internals.

@@ -405,28 +405,9 @@ func (conn Connection) execute(stmt db.Statement, parameters ...) (dbcur *cursor
 	return;
 }
 
-func returnResults(dc *cursor, ch chan db.Result) {
-	r, e := dc.Fetch();
-	for ; !closed(ch) && r != nil && e == nil; r, e = dc.Fetch() {
-		ch <- Result{r, nil}
-	}
-	if e != nil {
-		ch <- Result{nil, e}
-	}
-	close(ch);
-	dc.Close();
-}
-
-func (conn Connection) Execute(stmt db.Statement, parameters ...) (ch <-chan db.Result, err os.Error) {
-	var dc *cursor;
-	dc, err = conn.execute(stmt, parameters);
-	if err != nil {
-		ch = nil;
-		return;
-	}
-	sendch := make(chan db.Result);
-	go returnResults(dc, sendch);
-	ch = sendch;
+func (conn Connection) Execute(stmt db.Statement, parameters ...) (rs db.ResultSet, err os.Error) {
+	s := stmt.(Statement);
+	rs, err = NewResultSet(conn, s, parameters);
 	return;
 }
 
@@ -517,3 +498,50 @@ type Result struct {
 
 func (r Result) Data() []interface{}	{ return r.data }
 func (r Result) Error() os.Error	{ return r.error }
+
+type ResultSet struct {
+	conn	Connection;
+	cursor	*cursor;
+}
+
+func NewResultSet(conn Connection, stmt Statement, params ...) (rs ResultSet, err os.Error) {
+	rs = ResultSet{};
+	rs.conn = conn;
+	cur, e := conn.execute(stmt, params);
+	if e == nil {
+		rs.cursor = cur
+	} else {
+		err = e;
+	}
+	return;
+}
+
+func (rs ResultSet) Iter() (ch <-chan db.Result) {
+	sendch := make(chan db.Result);
+	go returnResults(rs.cursor, sendch);
+	ch = sendch;
+	return;
+}
+
+func returnResults(dc *cursor, ch chan db.Result) {
+	r, e := dc.Fetch();
+	for ; !closed(ch) && r != nil && e == nil; r, e = dc.Fetch() {
+		ch <- Result{r, nil}
+	}
+	if e != nil {
+		ch <- Result{nil, e}
+	}
+	e = dc.Close();
+	if e != nil {
+		ch <- Result{nil, e}
+	}
+	close(ch);
+}
+
+func (rs ResultSet) Close() (e os.Error) {
+	if rs.cursor != nil {
+		e = rs.cursor.Close();
+		rs.cursor = nil
+	}
+	return
+}
