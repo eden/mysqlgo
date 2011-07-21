@@ -1,5 +1,6 @@
 MySQL Bindings for Go (golang)
 ==============================
+![Abandoned](http://stillmaintained.com/eden/mysqlgo.png)
 
 Implements MySQL support for Go via libmysql.  The interface implements Peter
 Froehlich's [database interface](http://github.com/phf/go-db).  This is
