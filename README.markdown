@@ -1,1 +1,1 @@
-This project is defunct, see https://github.com/Philio/GoMySQL instead.
+This project is defunct, see https://github.com/ziutek/mymysql instead.
